@@ -1,12 +1,70 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Search, Bell, ShieldCheck, ChevronDown, LogOut, User, RefreshCw } from 'lucide-react';
+import {
+  Search,
+  Bell,
+  ShieldCheck,
+  ChevronDown,
+  LogOut,
+  User,
+  RefreshCw,
+  Sprout,
+  PackageCheck,
+  Warehouse,
+  Truck,
+  Store,
+} from 'lucide-react';
 import { RECENT_SYSTEM_ALERTS } from '../../data/mockData';
+
+export const getRoleDisplayName = (role) => {
+  switch ((role || '').toLowerCase()) {
+    case 'farmer':
+      return 'Farmer / Producer';
+    case 'supply_chain_manager':
+    case 'collection_center':
+    case 'warehouse':
+      return 'Supply Chain / Storage Manager';
+    case 'distributor':
+      return 'Distributor & Logistics';
+    case 'retailer':
+      return 'Retailer / Merchant';
+    case 'consumer':
+      return 'Consumer / Buyer';
+    case 'admin':
+      return 'Administrator';
+    default:
+      return (role || 'User').replace(/_/g, ' ');
+  }
+};
+
+const getRoleAvatarConfig = (role) => {
+  const normRole = (role || '').toLowerCase();
+  switch (normRole) {
+    case 'admin':
+      return { icon: ShieldCheck, bg: 'bg-indigo-100 text-indigo-700 border-indigo-300' };
+    case 'farmer':
+      return { icon: Sprout, bg: 'bg-emerald-100 text-emerald-700 border-emerald-300' };
+    case 'supply_chain_manager':
+    case 'collection_center':
+    case 'warehouse':
+      return { icon: Warehouse, bg: 'bg-blue-100 text-blue-700 border-blue-300' };
+    case 'distributor':
+      return { icon: Truck, bg: 'bg-purple-100 text-purple-700 border-purple-300' };
+    case 'retailer':
+      return { icon: Store, bg: 'bg-teal-100 text-teal-700 border-teal-300' };
+    case 'consumer':
+    default:
+      return { icon: User, bg: 'bg-slate-100 text-slate-700 border-slate-300' };
+  }
+};
 
 export const Header = ({ title }) => {
   const { user, switchRole, logout } = useAuth();
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showAlertsMenu, setShowAlertsMenu] = useState(false);
+
+  const roleAvatar = getRoleAvatarConfig(user?.role);
+  const AvatarIcon = roleAvatar.icon;
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-xs">
@@ -49,7 +107,7 @@ export const Header = ({ title }) => {
           >
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span className="hidden sm:inline">Role:</span>
-            <span className="font-bold text-slate-900">{user?.role}</span>
+            <span className="font-bold text-slate-900">{getRoleDisplayName(user?.role)}</span>
             <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
           </button>
 
@@ -71,7 +129,7 @@ export const Header = ({ title }) => {
                       user.role === r ? 'bg-emerald-50 text-emerald-800 font-bold' : 'text-slate-700'
                     }`}
                   >
-                    <span>{r}</span>
+                    <span>{getRoleDisplayName(r)}</span>
                     {user.role === r && <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>}
                   </button>
                 ))}
@@ -123,14 +181,15 @@ export const Header = ({ title }) => {
 
         {/* Profile Avatar */}
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-          <img
-            src={user?.avatar}
-            alt={user?.name}
-            className="w-8 h-8 rounded-full border border-emerald-500 object-cover"
-          />
+          <div
+            className={`w-8 h-8 rounded-full border ${roleAvatar.bg} flex items-center justify-center shrink-0 shadow-2xs`}
+            title={`${user?.name || 'User'} (${getRoleDisplayName(user?.role)})`}
+          >
+            <AvatarIcon className="w-4 h-4 stroke-[2.2]" />
+          </div>
           <div className="hidden lg:block text-left">
             <p className="text-xs font-bold text-slate-900 leading-tight">{user?.name}</p>
-            <p className="text-[10px] text-slate-500">{user?.organization}</p>
+            <p className="text-[10px] text-slate-500">{getRoleDisplayName(user?.role)}</p>
           </div>
           <button
             onClick={logout}

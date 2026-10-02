@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -11,13 +11,39 @@ import {
   QrCode,
   Store,
   Sprout,
-  Info
+  Info,
+  ShieldCheck
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { hasRoutePermission } from '../../config/permissions';
 import { METRICS } from '../../data/mockData';
+import { spoilageAPI } from '../../services/api';
 
 export const Sidebar = () => {
-  const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  const { user } = useAuth();
+  const [summary, setSummary] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    spoilageAPI
+      .getSummary()
+      .then((res) => {
+        if (isMounted && res.data) {
+          setSummary(res.data);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const riskBadgeCount = user?.role === 'farmer'
+    ? (summary ? summary.high_risk_count : 0)
+    : (summary ? summary.high_risk_count : METRICS.highRiskBatchesCount);
+  
+  const allNavItems = [
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Inventory', path: '/inventory', icon: Warehouse },
     { name: 'Batches', path: '/batches', icon: Package },
     { name: 'Orders', path: '/orders', icon: ShoppingCart },
@@ -26,13 +52,32 @@ export const Sidebar = () => {
       name: 'Risk Management',
       path: '/risk',
       icon: AlertTriangle,
-      badge: METRICS.highRiskBatchesCount,
+      badge: riskBadgeCount,
       badgeColor: 'bg-rose-500 text-white'
     },
     { name: 'Route Optimization', path: '/routes', icon: Navigation },
     { name: 'QR Traceability', path: '/traceability', icon: QrCode },
     { name: 'Marketplace', path: '/marketplace', icon: Store }
   ];
+
+  let visibleNavItems = allNavItems.filter((item) =>
+    hasRoutePermission(user?.role, item.path)
+  );
+
+  if (user?.role === 'supply_chain_manager') {
+    const hiddenPaths = ['/batches', '/orders', '/routes'];
+    visibleNavItems = visibleNavItems.filter(item => !hiddenPaths.includes(item.path));
+  }
+
+  if (user?.role === 'retailer') {
+    const hiddenPaths = ['/batches', '/forecasts', '/risk', '/routes'];
+    visibleNavItems = visibleNavItems.filter(item => !hiddenPaths.includes(item.path));
+  }
+
+  if (user?.role === 'distributor') {
+    const hiddenPaths = ['/forecasts', '/risk'];
+    visibleNavItems = visibleNavItems.filter(item => !hiddenPaths.includes(item.path));
+  }
 
   return (
     <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 min-h-screen border-r border-slate-800">
@@ -48,7 +93,9 @@ export const Sidebar = () => {
               AI
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 font-medium">Agri-Supply Intelligence</p>
+          <p className="text-[11px] text-slate-400 font-medium capitalize">
+            Role: <span className="text-emerald-400 font-semibold">{user?.role || 'Guest'}</span>
+          </p>
         </div>
       </div>
 
@@ -57,7 +104,7 @@ export const Sidebar = () => {
         <p className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-2">
           Supply Chain Core
         </p>
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -85,14 +132,15 @@ export const Sidebar = () => {
         })}
       </div>
 
+
       {/* Footer System Info */}
       <div className="p-4 border-t border-slate-800/80 bg-slate-950/50">
         <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
           <Info className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="font-semibold text-slate-300">Faculty MVP Demo</span>
+          <span className="font-semibold text-slate-300">AgroFlow AI</span>
         </div>
         <p className="text-[11px] text-slate-500 leading-relaxed">
-          Frontend Prototype v1.0 • Built with React & Recharts
+          Supply Chain Intelligence Platform
         </p>
       </div>
     </aside>

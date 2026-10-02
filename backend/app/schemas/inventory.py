@@ -10,6 +10,7 @@ class InventoryCreate(BaseModel):
     quantity: float
     temperature: Optional[float] = None
     humidity: Optional[float] = None
+    owner_id: Optional[int] = None
 
 
 class InventoryResponse(BaseModel):
@@ -19,6 +20,7 @@ class InventoryResponse(BaseModel):
     quantity: float
     temperature: Optional[float] = None
     humidity: Optional[float] = None
+    owner_id: Optional[int] = None
     updated_at: datetime
     batch: Optional[BatchResponse] = None
 

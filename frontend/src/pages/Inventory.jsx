@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { INVENTORY_ITEMS as MOCK_INVENTORY } from '../data/mockData';
 import { Badge } from '../components/common/Badge';
 import { Search, Plus, Warehouse, Thermometer, Calendar, AlertTriangle, Loader2, AlertCircle, CheckCircle2, X } from 'lucide-react';
-import { inventoryAPI, batchesAPI } from '../services/api';
+import { inventoryAPI, batchesAPI, spoilageAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export const Inventory = () => {
+  const { user } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [batches, setBatches] = useState([]);
+
+  const [spoilageRisks, setSpoilageRisks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
@@ -33,23 +36,26 @@ export const Inventory = () => {
     setLoading(true);
     setError(null);
     try {
-      const [invRes, batchRes] = await Promise.all([
+      const [invRes, batchRes, spoilageRes] = await Promise.all([
         inventoryAPI.getInventory().catch(() => ({ data: [] })),
         batchesAPI.getBatches().catch(() => ({ data: [] })),
+        spoilageAPI.getRisk().catch(() => ({ data: [] })),
       ]);
 
       const fetchedInv = invRes.data || [];
       const fetchedBatches = batchRes.data || [];
+      const fetchedRisks = spoilageRes.data || [];
 
       setInventory(fetchedInv);
       setBatches(fetchedBatches);
+      setSpoilageRisks(fetchedRisks);
 
       if (fetchedBatches.length > 0 && !formData.batch_id) {
         setFormData((prev) => ({ ...prev, batch_id: fetchedBatches[0].id }));
       }
     } catch (err) {
       console.error("Failed to load inventory data:", err);
-      setError("Failed to fetch live inventory from backend. Displaying cached stock.");
+      setError("Failed to fetch live inventory from backend.");
     } finally {
       setLoading(false);
     }
@@ -100,54 +106,37 @@ export const Inventory = () => {
     }
   };
 
-  // Map real backend inventory items or fallback to mockData
-  const displayItems = inventory.length > 0
-    ? inventory.map((item) => {
-        const cropName = item.batch?.product?.name || `Batch #${item.batch_id}`;
-        const category = item.batch?.product?.category || "Fruits & Vegetables";
-        const temp = item.temperature != null ? item.temperature : 18.0;
-        const hum = item.humidity != null ? item.humidity : 65.0;
+  // Map backend inventory items and attach backend spoilage risk intelligence
+  const displayItems = inventory
+    .filter((item) => item.quantity > 0)
+    .map((item) => {
+    const cropName = item.batch?.product?.name || `Batch #${item.batch_id}`;
+    const category = item.batch?.product?.category || "Fruits & Vegetables";
+    const temp = item.temperature != null ? item.temperature : 18.0;
+    const hum = item.humidity != null ? item.humidity : 65.0;
 
-        let riskScore = 15;
-        let status = 'Optimal';
+    // Use backend-derived spoilage risk score & risk level
+    const riskEval = spoilageRisks.find((r) => r.inventory_id === item.id);
+    const riskScore = riskEval ? riskEval.risk_score : 15;
+    const riskLevel = riskEval ? riskEval.risk_level : 'Low';
+    const status = riskLevel === 'High' ? 'High Risk' : riskLevel === 'Medium' ? 'Moderate Risk' : 'Optimal';
 
-        if (temp > 22.0 || hum > 75.0) {
-          riskScore = 78;
-          status = 'High Risk';
-        } else if (temp > 19.0 || hum > 68.0) {
-          riskScore = 42;
-          status = 'Moderate Risk';
-        }
-
-        return {
-          id: item.batch?.batch_code ? `INV-${item.batch.batch_code}` : `INV-LOT-${item.id}`,
-          rawId: item.id,
-          cropName: cropName,
-          category: category,
-          location: item.warehouse_location,
-          quantityKg: item.quantity,
-          quantityDisplay: item.quantity >= 1000 ? `${(item.quantity / 1000).toFixed(1)} Tons` : `${item.quantity} kg`,
-          storageTemp: `${temp}°C`,
-          humidity: `${hum}%`,
-          expiryDate: item.batch?.expiry_date || "2026-10-15",
-          spoilageRiskScore: riskScore,
-          status: status,
-        };
-      })
-    : MOCK_INVENTORY.map((item) => ({
-        id: item.id,
-        rawId: item.id,
-        cropName: item.cropName,
-        category: item.category,
-        location: item.location,
-        quantityKg: item.quantityTons * 1000,
-        quantityDisplay: `${item.quantityTons} Tons`,
-        storageTemp: item.storageTemp,
-        humidity: item.humidity,
-        expiryDate: item.expiryDate,
-        spoilageRiskScore: item.spoilageRiskScore,
-        status: item.status,
-      }));
+    return {
+      id: item.batch?.batch_code ? `INV-${item.batch.batch_code}` : `INV-LOT-${item.id}`,
+      rawId: item.id,
+      cropName: cropName,
+      category: category,
+      location: item.warehouse_location,
+      quantityKg: item.quantity,
+      quantityDisplay: item.quantity >= 1000 ? `${(item.quantity / 1000).toFixed(1)} Tons` : `${item.quantity} kg`,
+      storageTemp: `${temp}°C`,
+      humidity: `${hum}%`,
+      expiryDate: item.batch?.expiry_date || "2026-10-15",
+      spoilageRiskScore: riskScore,
+      status: status,
+      recommendation: riskEval ? riskEval.recommendation : '',
+    };
+  });
 
   // Filtering
   const filteredInventory = displayItems.filter((item) => {
@@ -165,7 +154,7 @@ export const Inventory = () => {
   
   const temps = displayItems.map(i => parseFloat(i.storageTemp) || 18.0);
   const avgTemp = temps.length > 0 ? (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1) : "18.0";
-  const highRiskCount = displayItems.filter(i => i.status === 'High Risk' || i.spoilageRiskScore > 50).length;
+  const highRiskCount = displayItems.filter(i => i.status === 'High Risk' || i.spoilageRiskScore >= 60).length;
 
   return (
     <div className="space-y-6">
@@ -204,7 +193,7 @@ export const Inventory = () => {
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase">Spoilage Risk Alerts</p>
             <p className="text-2xl font-bold text-rose-600 mt-1">{highRiskCount} Batches Alert</p>
-            <p className="text-[11px] text-rose-500 font-medium">Action recommended &lt; 48h</p>
+            <p className="text-[11px] text-rose-500 font-medium">Backend Rule-based Evaluation</p>
           </div>
           <div className="p-3 bg-rose-50 text-rose-600 rounded-lg border border-rose-100">
             <AlertTriangle className="w-6 h-6" />
@@ -243,16 +232,20 @@ export const Inventory = () => {
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            setFormError(null);
-            setShowAddModal(true);
-          }}
-          className="flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" /> Add Inventory Item
-        </button>
+        {['admin', 'supply_chain_manager', 'warehouse', 'collection_center', 'farmer'].includes(user?.role) && (
+          <button
+            onClick={() => {
+              setFormError(null);
+              setShowAddModal(true);
+            }}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" /> Add Storage Inventory
+          </button>
+        )}
       </div>
+
+
 
       {/* Success Banner */}
       {successMessage && (
@@ -295,7 +288,7 @@ export const Inventory = () => {
                   <th className="py-3 px-4">Stock Level</th>
                   <th className="py-3 px-4">Temp / Humidity</th>
                   <th className="py-3 px-4">Est. Expiry</th>
-                  <th className="py-3 px-4">Spoilage Risk</th>
+                  <th className="py-3 px-4">Spoilage Risk (Backend Rule)</th>
                   <th className="py-3 px-4 text-right">Status</th>
                 </tr>
               </thead>
@@ -324,9 +317,9 @@ export const Inventory = () => {
                         <div className="w-16 bg-slate-200 h-2 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
-                              item.spoilageRiskScore < 20
+                              item.spoilageRiskScore < 30
                                 ? 'bg-emerald-500'
-                                : item.spoilageRiskScore < 50
+                                : item.spoilageRiskScore < 60
                                 ? 'bg-amber-500'
                                 : 'bg-rose-500'
                             }`}

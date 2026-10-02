@@ -6,6 +6,7 @@ from app.models.inventory import Inventory
 from app.models.order import Order, OrderItem
 from app.models.shipment import Shipment
 from app.models.traceability import TraceabilityEvent
+from app.models.historical_data import HistoricalSupplyChainData
 
 __all__ = [
     "Base",
@@ -18,4 +19,5 @@ __all__ = [
     "OrderItem",
     "Shipment",
     "TraceabilityEvent",
+    "HistoricalSupplyChainData",
 ]

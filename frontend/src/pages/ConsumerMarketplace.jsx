@@ -85,7 +85,7 @@ export const ConsumerMarketplace = () => {
 
       await ordersAPI.createOrder(payload);
 
-      setSuccessMessage(`Order #${orderNum} successfully placed for ${qty} kg of ${orderModalProduct.name}! Track it in Wholesale Orders.`);
+      setSuccessMessage(`Order #${orderNum} successfully placed for ${qty} kg of ${orderModalProduct.name}! Track your purchase in My Orders.`);
       setOrderModalProduct(null);
 
       // Refresh inventory & orders data
@@ -101,66 +101,63 @@ export const ConsumerMarketplace = () => {
     }
   };
 
-  // Map real backend products + PostgreSQL inventory availability or fallback to mockData
-  const displayProducts = products.length > 0
-    ? products.map((p) => {
-        // Calculate total stock for this product from inventory records
-        const matchingInventory = inventory.filter((inv) => inv.batch?.product_id === p.id);
-        const availableStock = matchingInventory.reduce((acc, inv) => acc + (inv.quantity || 0), 0);
+  // Map real backend products + PostgreSQL retailer inventory availability
+  const displayProducts = products
+    .map((p) => {
+      // Calculate total retailer stock for this product
+      const matchingInventory = inventory.filter((inv) => inv.batch?.product_id === p.id && inv.quantity > 0);
+      const availableStock = matchingInventory.reduce((acc, inv) => acc + (inv.quantity || 0), 0);
 
-        // Find associated batch for origin & traceability link
-        const matchingBatch = batches.find((b) => b.product_id === p.id) || batches[0];
-        const farmerName = matchingBatch?.farmer?.name || "Nashik Farmer Co-Op";
-        const originLocation = matchingBatch?.origin_location || "Maharashtra Orchard";
+      const matchingBatches = batches.filter((b) => b.product_id === p.id);
+      const matchingBatch = matchingBatches[0] || (matchingInventory[0]?.batch) || batches[0];
+      const farmerName = matchingBatch?.farmer?.name || "Verified Farm Origin";
+      const originLocation = matchingBatch?.origin_location || "Regional Hub";
 
-        // Assign standard market price per unit based on product category
-        const pricePerKg = p.category === 'Fruits' ? 3.50 : 2.75;
-        const discountPrice = (pricePerKg * 0.9).toFixed(2);
+      const pricePerKg = p.price ? p.price : (p.category === 'Fruits' ? 120 : 45);
+      const discountPrice = Math.round(pricePerKg * 0.9);
 
-        // Standard image mapping for demo visuals
-        const image = p.category === 'Fruits'
-          ? "https://images.unsplash.com/photo-1553279768-865429fa0078?w=500&auto=format&fit=crop&q=80"
-          : "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&auto=format&fit=crop&q=80";
-
-        let stockBadge = "In Stock (Proven Origin)";
-        let stockVariant = "emerald";
-
-        if (availableStock <= 0) {
-          stockBadge = "Out of Stock";
-          stockVariant = "red";
-        } else if (availableStock < 300) {
-          stockBadge = "Low Stock Alert";
-          stockVariant = "amber";
+      const getProductImage = (name, category) => {
+        const nameLower = (name || '').toLowerCase().trim();
+        if (nameLower.includes('onion')) {
+          return "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=500&auto=format&fit=crop&q=80";
         }
+        if (nameLower.includes('potato')) {
+          return "https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=500&auto=format&fit=crop&q=80";
+        }
+        if (nameLower.includes('apple')) {
+          return "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=500&auto=format&fit=crop&q=80";
+        }
+        if (nameLower.includes('mango')) {
+          return "https://images.unsplash.com/photo-1553279768-865429fa0078?w=500&auto=format&fit=crop&q=80";
+        }
+        return category === 'Fruits'
+          ? "https://images.unsplash.com/photo-1553279768-865429fa0078?w=500&auto=format&fit=crop&q=80"
+          : "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=500&auto=format&fit=crop&q=80";
+      };
 
-        return {
-          id: p.id.toString(),
-          rawId: p.id,
-          name: p.name,
-          category: p.category,
-          unit: p.unit || 'kg',
-          pricePerKg: pricePerKg,
-          discountPrice: discountPrice,
-          availableStock: availableStock > 0 ? availableStock : (matchingBatch ? matchingBatch.quantity : 500),
-          farmer: `${farmerName} • ${originLocation}`,
-          harvestTime: matchingBatch ? `Harvested: ${matchingBatch.harvest_date}` : "Harvested 2 days ago",
-          batchId: matchingBatch ? matchingBatch.id.toString() : "1",
-          batchCode: matchingBatch ? (matchingBatch.batch_code || `BATCH-${matchingBatch.id}`) : "BATCH-2026-001",
-          freshnessIndex: 98,
-          rating: 4.9,
-          reviews: 124,
-          badge: stockBadge,
-          stockVariant: stockVariant,
-          image: image,
-        };
-      })
-    : MOCK_MARKETPLACE.map((p) => ({
-        ...p,
-        rawId: 1,
-        availableStock: 500,
-        batchId: p.batchId || "1",
-        pricePerKg: parseFloat(p.pricePerKg) || 3.5,
-      }));
+      const image = getProductImage(p.name, p.category);
+
+      return {
+        id: p.id.toString(),
+        rawId: p.id,
+        name: p.name,
+        category: p.category,
+        unit: p.unit || 'kg',
+        pricePerKg: pricePerKg,
+        discountPrice: discountPrice,
+        availableStock: Math.max(0, availableStock),
+        farmer: `${farmerName} • ${originLocation}`,
+        harvestTime: matchingBatch ? `Harvested: ${matchingBatch.harvest_date}` : "Verified Batch",
+        batchId: matchingBatch ? matchingBatch.id.toString() : "1",
+        batchCode: matchingBatch ? (matchingBatch.batch_code || `BATCH-${matchingBatch.id}`) : "BATCH-2026-001",
+        freshnessIndex: 98,
+        rating: 4.9,
+        reviews: 124,
+        badge: availableStock > 0 ? "In Stock (Retail Store)" : "Out of Stock",
+        stockVariant: availableStock > 0 ? "emerald" : "rose",
+        image: image,
+      };
+    });
 
   // Filtering
   const filteredProducts = displayProducts.filter((p) => {
@@ -231,7 +228,7 @@ export const ConsumerMarketplace = () => {
             <span>{successMessage}</span>
           </div>
           <Link to="/orders" className="text-xs font-bold text-emerald-700 hover:underline">
-            View Wholesale Orders &rarr;
+            View My Orders &rarr;
           </Link>
         </div>
       )}
@@ -324,7 +321,7 @@ export const ConsumerMarketplace = () => {
                   disabled={product.availableStock <= 0}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <ShoppingCart className="w-3.5 h-3.5" /> Direct Purchase
+                  <ShoppingCart className="w-3.5 h-3.5" /> {product.availableStock > 0 ? "Direct Purchase" : "Out of Stock"}
                 </button>
               </div>
             </div>

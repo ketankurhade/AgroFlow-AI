@@ -70,3 +70,24 @@ def get_current_user(token: Optional[str] = Depends(oauth2_scheme), db: Session 
     if user is None:
         raise credentials_exception
     return user
+
+
+def require_roles(*allowed_roles: str):
+    """
+    Dependency that verifies the authenticated user has one of the allowed roles.
+    Admin role always bypasses role checks unless specifically restricted.
+    Raises 401 if unauthenticated and 403 if unauthorized.
+    """
+    def role_checker(current_user: User = Depends(get_current_user)) -> User:
+        user_role = current_user.role
+        if user_role in ("collection_center", "warehouse"):
+            user_role = "supply_chain_manager"
+
+        if current_user.role == "admin" or user_role in allowed_roles or current_user.role in allowed_roles:
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: Role '{current_user.role}' is not authorized to perform this operation."
+        )
+    return role_checker
+

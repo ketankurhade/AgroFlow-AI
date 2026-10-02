@@ -4,8 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
 import app.models  # Ensures all models are registered with Base.metadata
+from seed import ensure_products_seeded
 
 from app.routers import (
     auth,
@@ -15,6 +16,12 @@ from app.routers import (
     orders,
     shipments,
     traceability,
+    routes,
+    spoilage,
+    historical,
+    demand,
+    price,
+    intelligence,
 )
 
 load_dotenv()
@@ -29,7 +36,21 @@ async def lifespan(app: FastAPI):
     # Startup: Create tables if they do not exist
     try:
         Base.metadata.create_all(bind=engine)
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS price FLOAT DEFAULT 45.0;"))
+            conn.execute(text("ALTER TABLE inventory ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id);"))
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS retailer_id INTEGER REFERENCES users(id);"))
+            conn.execute(text("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS batch_id INTEGER REFERENCES batches(id);"))
+            conn.execute(text("ALTER TABLE shipments ADD COLUMN IF NOT EXISTS expected_delivery_at TIMESTAMP WITH TIME ZONE;"))
+            conn.execute(text("ALTER TABLE shipments ADD COLUMN IF NOT EXISTS is_inventory_credited BOOLEAN DEFAULT FALSE;"))
+            conn.commit()
         print("Database tables initialized successfully.")
+        db = SessionLocal()
+        try:
+            ensure_products_seeded(db)
+        finally:
+            db.close()
     except Exception as e:
         print(f"Database initialization warning: {e}")
     yield
@@ -61,6 +82,12 @@ app.include_router(inventory.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(shipments.router, prefix="/api")
 app.include_router(traceability.router, prefix="/api")
+app.include_router(routes.router, prefix="/api")
+app.include_router(spoilage.router, prefix="/api")
+app.include_router(historical.router, prefix="/api")
+app.include_router(demand.router, prefix="/api")
+app.include_router(price.router, prefix="/api")
+app.include_router(intelligence.router, prefix="/api")
 
 
 @app.get("/api/health", tags=["Health"])

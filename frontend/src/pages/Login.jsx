@@ -1,33 +1,27 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Sprout, Lock, Mail, Shield, CheckCircle2, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
-import { INITIAL_USER } from '../data/mockData';
+import { Sprout, Lock, Mail, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 
 export const Login = () => {
   const navigate = useNavigate();
   const { login, error, setError } = useAuth();
-  const [selectedRole, setSelectedRole] = useState("Supply Chain Manager (Admin)");
-  const [email, setEmail] = useState("farmer.ramesh@agroflow.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLoginSubmit = async (emailToUse, passwordToUse, targetPath = '/') => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setIsSubmitting(true);
     setError(null);
     try {
-      await login(emailToUse, passwordToUse);
-      navigate(targetPath);
+      await login(email, password);
+      navigate('/dashboard');
     } catch (err) {
-      console.error("Login submit error:", err);
+      console.error("Login authentication error:", err);
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    handleLoginSubmit(email, password, '/');
   };
 
   return (
@@ -42,15 +36,15 @@ export const Login = () => {
         </div>
         <h2 className="text-3xl font-black tracking-tight text-white">AgroFlow AI</h2>
         <p className="mt-2 text-sm text-slate-400 font-medium">
-          Intelligent Agricultural Supply Chain Management System
+          Intelligent Agricultural Supply Chain Management Platform
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md z-10">
-        <div className="bg-slate-800/80 backdrop-blur-md border border-slate-700/80 py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
+        <div className="bg-slate-800/80 backdrop-blur-md border border-slate-700/80 py-8 px-6 shadow-2xl rounded-2xl sm:px-10 space-y-6">
           
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-rose-400 text-xs font-medium">
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-rose-400 text-xs font-medium">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -58,24 +52,7 @@ export const Login = () => {
 
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                Select Portal Role (Demo)
-              </label>
-              <select
-                value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-xs text-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-              >
-                {INITIAL_USER.availableRoles.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                 Email Address
               </label>
               <div className="relative">
@@ -87,14 +64,14 @@ export const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder="farmer.ramesh@agroflow.com"
-                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-700 rounded-lg bg-slate-900 text-white placeholder-slate-500 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  placeholder="Enter your email address"
+                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-700 rounded-xl bg-slate-900 text-white placeholder-slate-500 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                 Password
               </label>
               <div className="relative">
@@ -106,8 +83,8 @@ export const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  placeholder="password123"
-                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-700 rounded-lg bg-slate-900 text-white placeholder-slate-500 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  placeholder="Enter your password"
+                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-700 rounded-xl bg-slate-900 text-white placeholder-slate-500 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 />
               </div>
             </div>
@@ -124,67 +101,19 @@ export const Login = () => {
                 </>
               ) : (
                 <>
-                  Sign In to AgroFlow AI Portal <ArrowRight className="w-4 h-4" />
+                  Sign In to AgroFlow AI <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Preset Demo Roles Quick Access */}
-          <div className="mt-6 pt-6 border-t border-slate-700/80">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
-              Quick Role Test Launchers
+          <div className="pt-4 border-t border-slate-700/80 text-center">
+            <p className="text-xs text-slate-400">
+              Don't have an account?{' '}
+              <Link to="/register" className="font-bold text-emerald-400 hover:text-emerald-300 hover:underline">
+                Register here
+              </Link>
             </p>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("farmer.ramesh@agroflow.com");
-                  setPassword("password123");
-                  setSelectedRole("Farmer / Producer");
-                  handleLoginSubmit("farmer.ramesh@agroflow.com", "password123", '/');
-                }}
-                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 text-left font-medium transition-colors cursor-pointer"
-              >
-                🌱 Farmer View
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("farmer.suresh@agroflow.com");
-                  setPassword("password123");
-                  setSelectedRole("Warehouse Cold-Chain Lead");
-                  handleLoginSubmit("farmer.suresh@agroflow.com", "password123", '/');
-                }}
-                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 text-left font-medium transition-colors cursor-pointer"
-              >
-                🏭 Warehouse Lead
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("buyer.organic@agroflow.com");
-                  setPassword("password123");
-                  setSelectedRole("Distributor & Logistics");
-                  handleLoginSubmit("buyer.organic@agroflow.com", "password123", '/');
-                }}
-                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 text-left font-medium transition-colors cursor-pointer"
-              >
-                🚛 Fleet Manager
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("buyer.freshmart@agroflow.com");
-                  setPassword("password123");
-                  setSelectedRole("Consumer");
-                  handleLoginSubmit("buyer.freshmart@agroflow.com", "password123", '/marketplace');
-                }}
-                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 text-left font-medium transition-colors cursor-pointer"
-              >
-                🛒 Consumer Portal
-              </button>
-            </div>
           </div>
         </div>
       </div>

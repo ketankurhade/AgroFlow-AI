@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -11,6 +11,7 @@ class Product(Base):
     name = Column(String(120), nullable=False, index=True)
     category = Column(String(80), nullable=False)
     unit = Column(String(20), nullable=False, default="kg")
+    price = Column(Float, nullable=False, default=45.0)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     batches = relationship("Batch", back_populates="product")

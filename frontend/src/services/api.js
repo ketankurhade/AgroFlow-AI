@@ -67,18 +67,55 @@ export const ordersAPI = {
   getOrders: (params) => api.get('/orders', { params }),
   getOrder: (id) => api.get(`/orders/${id}`),
   createOrder: (data) => api.post('/orders', data),
+  updateOrderStatus: (id, data) => api.patch(`/orders/${id}/status`, data),
 };
 
 // SHIPMENTS API Services
 export const shipmentsAPI = {
   getShipments: (params) => api.get('/shipments', { params }),
   getShipment: (id) => api.get(`/shipments/${id}`),
+  createShipment: (data) => api.post('/shipments', data),
+  updateShipmentStatus: (id, status) => api.patch(`/shipments/${id}/status`, { status }),
 };
 
 // TRACEABILITY API Services
 export const traceabilityAPI = {
   getBatchTraceability: (batchId) => api.get(`/traceability/batch/${batchId}`),
   createTraceabilityEvent: (data) => api.post('/traceability/events', data),
+};
+
+// ROUTE OPTIMIZATION API Services
+export const routesAPI = {
+  optimizeRoute: (data) => api.post('/routes/optimize', data),
+  getSupportedLocations: () => api.get('/routes/locations'),
+};
+
+// SPOILAGE INTELLIGENCE API Services
+export const spoilageAPI = {
+  getRisk: (params) => api.get('/spoilage/risk', { params }),
+  getSummary: () => api.get('/spoilage/summary'),
+  predictML: (data) => api.post('/spoilage/ml-predict', data),
+  getModelSummaryML: () => api.get('/spoilage/ml-model-summary'),
+  analyzeCombined: (data) => api.post('/spoilage/analyze', data),
+};
+
+// ML DEMAND FORECASTING API Services
+export const demandAPI = {
+  predict: (data) => api.post('/demand/predict', data),
+  getModelSummary: () => api.get('/demand/model-summary'),
+  getForecast: (productName) => api.get('/demand/forecast', { params: { product_name: productName } }),
+};
+
+// ML PRICE FORECASTING API Services
+export const priceAPI = {
+  predict: (data) => api.post('/price/predict', data),
+  getModelSummary: () => api.get('/price/model-summary'),
+  getForecast: (productName) => api.get('/price/forecast', { params: { product_name: productName } }),
+};
+
+// INTELLIGENCE INTEGRATION & DECISION LAYER API Services
+export const intelligenceAPI = {
+  analyze: (data) => api.post('/intelligence/analyze', data),
 };
 
 export default api;

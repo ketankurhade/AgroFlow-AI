@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -15,7 +15,9 @@ class Shipment(Base):
     vehicle_number = Column(String(50), nullable=False)
     status = Column(String(50), nullable=False, default="In Transit")
     dispatched_at = Column(DateTime(timezone=True), nullable=True)
+    expected_delivery_at = Column(DateTime(timezone=True), nullable=True)
     delivered_at = Column(DateTime(timezone=True), nullable=True)
+    is_inventory_credited = Column(Boolean, nullable=False, default=False)
 
     order = relationship("Order", back_populates="shipments")
     batch = relationship("Batch", back_populates="shipments")

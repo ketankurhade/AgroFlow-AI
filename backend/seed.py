@@ -11,12 +11,41 @@ from app.models.traceability import TraceabilityEvent
 from app.services.auth_service import get_password_hash
 
 
+DEFAULT_PRODUCTS = [
+    {"name": "Onion", "category": "Vegetable", "unit": "kg", "price": 35.0},
+    {"name": "Potato", "category": "Vegetable", "unit": "kg", "price": 30.0},
+    {"name": "Apple", "category": "Fruit", "unit": "kg", "price": 150.0},
+    {"name": "Mango", "category": "Fruit", "unit": "kg", "price": 120.0},
+]
+
+
+def ensure_products_seeded(db):
+    """Ensures all default agricultural products are present in the catalog."""
+    for prod_def in DEFAULT_PRODUCTS:
+        existing = db.query(Product).filter(Product.name == prod_def["name"]).first()
+        if not existing:
+            db.add(Product(
+                name=prod_def["name"],
+                category=prod_def["category"],
+                unit=prod_def["unit"],
+                price=prod_def.get("price", 45.0)
+            ))
+    db.commit()
+
+
 def seed_db():
     print("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
     try:
+        # Ensure default products exist regardless of user presence
+        ensure_products_seeded(db)
+
+        # Migrate existing development users with legacy roles to supply_chain_manager
+        db.query(User).filter(User.role.in_(["collection_center", "collection_manager", "warehouse", "warehouse_manager"])).update({"role": "supply_chain_manager"}, synchronize_session=False)
+        db.commit()
+
         # Check if users exist to prevent duplicate seeding
         if db.query(User).filter(User.email == "farmer.ramesh@agroflow.com").first():
             print("Seed data already present in database.")
@@ -24,7 +53,7 @@ def seed_db():
 
         print("Seeding initial development data...")
 
-        # 1. Farmers & Buyers
+        # 1. Farmers, Managers & Buyers
         farmer1 = User(
             name="Ramesh Kumar",
             email="farmer.ramesh@agroflow.com",
@@ -36,6 +65,12 @@ def seed_db():
             email="farmer.suresh@agroflow.com",
             password_hash=get_password_hash("password123"),
             role=UserRole.FARMER.value
+        )
+        manager1 = User(
+            name="Anita Sharma",
+            email="manager.anita@agroflow.com",
+            password_hash=get_password_hash("password123"),
+            role=UserRole.SUPPLY_CHAIN_MANAGER.value
         )
         buyer1 = User(
             name="FreshMart Retail",
@@ -50,15 +85,12 @@ def seed_db():
             role=UserRole.DISTRIBUTOR.value
         )
 
-        db.add_all([farmer1, farmer2, buyer1, buyer2])
+        db.add_all([farmer1, farmer2, manager1, buyer1, buyer2])
         db.flush()
 
-        # 2. Products
-        prod1 = Product(name="Organic Alphonso Mangoes", category="Fruits", unit="kg")
-        prod2 = Product(name="Fresh Desi Tomatoes", category="Vegetables", unit="kg")
-
-        db.add_all([prod1, prod2])
-        db.flush()
+        # Fetch products from DB after ensure_products_seeded
+        prod1 = db.query(Product).filter(Product.name == "Organic Alphonso Mangoes").first()
+        prod2 = db.query(Product).filter(Product.name == "Fresh Desi Tomatoes").first()
 
         # 3. Batches
         today = date.today()

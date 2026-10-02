@@ -1,8 +1,11 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { hasRoutePermission } from './config/permissions';
 import { DashboardLayout } from './layouts/DashboardLayout';
+import { LandingPage } from './pages/LandingPage';
 import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { Inventory } from './pages/Inventory';
 import { Batches } from './pages/Batches';
@@ -11,10 +14,11 @@ import { Forecasts } from './pages/Forecasts';
 import { RiskManagement } from './pages/RiskManagement';
 import { RouteOptimization } from './pages/RouteOptimization';
 import { QRTraceability } from './pages/QRTraceability';
-import { ConsumerMarketplace } from './pages/ConsumerMarketplace';
+import { Marketplace } from './pages/Marketplace';
+import { AccessDenied } from './pages/AccessDenied';
 
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute = ({ children, path }) => {
+  const { isAuthenticated, loading, user } = useAuth();
   
   if (loading) {
     return (
@@ -30,6 +34,11 @@ const ProtectedRoute = ({ children }) => {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+
+  if (path && !hasRoutePermission(user?.role, path)) {
+    return <AccessDenied />;
+  }
+
   return children;
 };
 
@@ -38,24 +47,26 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route
-            path="/"
             element={
               <ProtectedRoute>
                 <DashboardLayout />
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="batches" element={<Batches />} />
-            <Route path="orders" element={<Orders />} />
-            <Route path="forecasts" element={<Forecasts />} />
-            <Route path="risk" element={<RiskManagement />} />
-            <Route path="routes" element={<RouteOptimization />} />
-            <Route path="traceability" element={<QRTraceability />} />
-            <Route path="marketplace" element={<ConsumerMarketplace />} />
+            <Route path="dashboard" element={<ProtectedRoute path="/dashboard"><Dashboard /></ProtectedRoute>} />
+            <Route path="inventory" element={<ProtectedRoute path="/inventory"><Inventory /></ProtectedRoute>} />
+            <Route path="batches" element={<ProtectedRoute path="/batches"><Batches /></ProtectedRoute>} />
+            <Route path="orders" element={<ProtectedRoute path="/orders"><Orders /></ProtectedRoute>} />
+            <Route path="forecasts" element={<ProtectedRoute path="/forecasts"><Forecasts /></ProtectedRoute>} />
+            <Route path="risk" element={<ProtectedRoute path="/risk"><RiskManagement /></ProtectedRoute>} />
+            <Route path="routes" element={<ProtectedRoute path="/routes"><RouteOptimization /></ProtectedRoute>} />
+            <Route path="traceability" element={<ProtectedRoute path="/traceability"><QRTraceability /></ProtectedRoute>} />
+            <Route path="marketplace" element={<ProtectedRoute path="/marketplace"><Marketplace /></ProtectedRoute>} />
+            <Route path="access-denied" element={<AccessDenied />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -63,3 +74,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

@@ -7,8 +7,7 @@ from app.database import Base
 
 class UserRole(str, enum.Enum):
     FARMER = "farmer"
-    COLLECTION_MANAGER = "collection_manager"
-    WAREHOUSE_MANAGER = "warehouse_manager"
+    SUPPLY_CHAIN_MANAGER = "supply_chain_manager"
     DISTRIBUTOR = "distributor"
     RETAILER = "retailer"
     ADMIN = "admin"
@@ -27,3 +26,4 @@ class User(Base):
 
     batches = relationship("Batch", back_populates="farmer", foreign_keys="[Batch.farmer_id]")
     orders = relationship("Order", back_populates="buyer", foreign_keys="[Order.buyer_id]")
+

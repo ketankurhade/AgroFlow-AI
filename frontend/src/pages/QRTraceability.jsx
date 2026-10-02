@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BATCHES as MOCK_BATCHES } from '../data/mockData';
 import { Badge } from '../components/common/Badge';
 import { QrCode, Search, CheckCircle2, ShieldCheck, MapPin, Calendar, Sprout, Plus, Loader2, AlertCircle, X, ExternalLink } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { batchesAPI, traceabilityAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export const QRTraceability = () => {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
   const urlBatchParam = searchParams.get('batch') || '';
 
   const [batches, setBatches] = useState([]);
@@ -20,7 +22,7 @@ export const QRTraceability = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modal State
+  // Modal State for Admin Manual Provenance Creation
   const [showAddEventModal, setShowAddEventModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
@@ -46,7 +48,7 @@ export const QRTraceability = () => {
           initial = fetchedBatches.find(
             (b) =>
               b.id.toString() === urlBatchParam ||
-              b.batch_code.toLowerCase() === urlBatchParam.toLowerCase()
+              (b.batch_code && b.batch_code.toLowerCase() === urlBatchParam.toLowerCase())
           );
         }
         const selected = initial || fetchedBatches[0];
@@ -55,7 +57,7 @@ export const QRTraceability = () => {
       }
     } catch (err) {
       console.error("Failed to load batches:", err);
-      setError("Failed to connect to backend. Displaying cached batch traceability.");
+      setError("Failed to fetch batches from backend. Check network or permissions.");
     } finally {
       setLoadingBatches(false);
     }
@@ -87,6 +89,7 @@ export const QRTraceability = () => {
   }, [activeBatch]);
 
   const handleSelectBatch = (batch) => {
+    if (!batch) return;
     setActiveBatch(batch);
     setSearchQuery(batch.batch_code || `BATCH-${batch.id}`);
     setSearchParams({ batch: batch.id.toString() });
@@ -98,9 +101,9 @@ export const QRTraceability = () => {
 
     const found = batches.find(
       (b) =>
-        b.batch_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.id.toString() === searchQuery ||
-        (b.product && b.product.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        (b.batch_code && b.batch_code.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        b.id.toString() === searchQuery.trim() ||
+        (b.product && b.product.name && b.product.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     if (found) {
@@ -168,39 +171,44 @@ export const QRTraceability = () => {
   return (
     <div className="space-y-6">
       {/* Search & Selection Header */}
-      <div className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white p-6 rounded-2xl shadow-md border border-emerald-700">
-        <div className="max-w-2xl mx-auto text-center space-y-3">
+      <div className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white p-6 rounded-2xl shadow-md border border-emerald-700 space-y-4">
+        <div className="max-w-2xl mx-auto text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
             <QrCode className="w-4 h-4" /> QR Provenance Traceability Engine
           </div>
-          <h2 className="text-2xl font-black">Scan or Select Agricultural Batch</h2>
+          <h2 className="text-2xl font-black">Select Agricultural Batch to View Traceability</h2>
           <p className="text-xs text-emerald-100">
-            Verify 100% farm-to-fork origin transparency, harvest date, temperature logs, and quality grade certificates stored in PostgreSQL.
+            Verify 100% farm-to-fork origin transparency, harvest date, temperature logs, and transport provenance stored in PostgreSQL.
           </p>
+        </div>
 
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 max-w-lg mx-auto pt-2">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Enter Batch Code (e.g. BATCH-2026-001)..."
-                className="w-full bg-white text-slate-900 rounded-xl pl-9 pr-3 py-2.5 text-xs font-semibold focus:outline-hidden"
-              />
-            </div>
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs transition-colors cursor-pointer"
+        {/* Primary Batch Dropdown Selector */}
+        <div className="max-w-xl mx-auto bg-emerald-950/70 p-4 rounded-xl border border-emerald-600/50 space-y-3">
+          <div>
+            <label className="block text-xs font-bold text-emerald-200 mb-1.5 uppercase tracking-wider">
+              Select Batch for Traceability Inspection <span className="text-emerald-400">*</span>
+            </label>
+            <select
+              value={activeBatch?.id || ''}
+              onChange={(e) => {
+                const b = batches.find((item) => item.id === parseInt(e.target.value));
+                if (b) handleSelectBatch(b);
+              }}
+              className="w-full bg-white text-slate-900 font-semibold rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-emerald-400 focus:outline-hidden"
             >
-              Verify Provenance
-            </button>
-          </form>
+              <option value="">-- Select Harvest Batch --</option>
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.batch_code || `BATCH-${b.id}`} — {b.product?.name || `Product #${b.product_id}`} ({b.quantity} kg | Origin: {b.origin_location} | Status: {b.status})
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Quick Batch Selector Pills */}
           {batches.length > 0 && (
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
-              <span className="text-[11px] text-emerald-200 font-semibold">Available Batches:</span>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              <span className="text-[11px] text-emerald-300 font-semibold">Available Stock:</span>
               {batches.map((b) => (
                 <button
                   key={b.id}
@@ -208,7 +216,7 @@ export const QRTraceability = () => {
                   className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                     activeBatch?.id === b.id
                       ? 'bg-white text-emerald-950 shadow-xs ring-2 ring-emerald-400'
-                      : 'bg-emerald-900/60 text-emerald-200 hover:bg-emerald-800'
+                      : 'bg-emerald-900/80 text-emerald-200 hover:bg-emerald-800'
                   }`}
                 >
                   {b.batch_code || `BATCH-${b.id}`}
@@ -217,6 +225,26 @@ export const QRTraceability = () => {
             </div>
           )}
         </div>
+
+        {/* Secondary Manual Search */}
+        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 max-w-lg mx-auto pt-1">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Or search by Batch Code / ID..."
+              className="w-full bg-white/90 text-slate-900 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold focus:outline-hidden focus:bg-white"
+            />
+          </div>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs transition-colors cursor-pointer"
+          >
+            Search Batch
+          </button>
+        </form>
       </div>
 
       {/* Success Banner */}
@@ -266,7 +294,7 @@ export const QRTraceability = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 pt-1">
                 <div className="flex items-center gap-2">
                   <Sprout className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Farmer / Producer: <strong className="text-slate-900">{activeBatch.farmer?.name || "Ramesh Kumar"}</strong></span>
+                  <span>Farmer / Producer: <strong className="text-slate-900">{activeBatch.farmer?.name || "Verified Farmer"}</strong></span>
                 </div>
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -316,22 +344,25 @@ export const QRTraceability = () => {
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-slate-900">Complete Journey & Storage Log Timeline</h4>
+                <h4 className="text-sm font-bold text-slate-900">Chronological Provenance Timeline</h4>
                 {events.length > 0 && (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    {events.length} Recorded Steps
+                    {events.length} Recorded Stage{events.length > 1 ? 's' : ''}
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => {
-                  setFormError(null);
-                  setShowAddEventModal(true);
-                }}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Provenance Step
-              </button>
+              {/* Strictly View-Only for Operational Users. Only Admin can manually record provenance */}
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => {
+                    setFormError(null);
+                    setShowAddEventModal(true);
+                  }}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Provenance Step
+                </button>
+              )}
             </div>
 
             {loadingEvents ? (
@@ -366,29 +397,25 @@ export const QRTraceability = () => {
             ) : (
               <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl text-center space-y-2">
                 <p className="text-xs text-slate-600 font-medium">No provenance events recorded for this batch yet.</p>
-                <button
-                  onClick={() => setShowAddEventModal(true)}
-                  className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold"
-                >
-                  Record First Trace Event
-                </button>
               </div>
             )}
           </div>
         </div>
       ) : (
-        <div className="bg-white p-8 text-center rounded-2xl border border-slate-200">
-          <p className="text-sm font-bold text-slate-700">No matching batch found for query "{searchQuery}"</p>
+        <div className="bg-white p-8 text-center rounded-2xl border border-slate-200 text-slate-500 text-xs">
+          {batches.length === 0
+            ? "No eligible batches available in database."
+            : "Select a batch from the dropdown above to view its complete provenance timeline."}
         </div>
       )}
 
-      {/* ADD TRACEABILITY EVENT MODAL */}
-      {showAddEventModal && (
+      {/* ADD TRACEABILITY EVENT MODAL (ADMIN-ONLY) */}
+      {showAddEventModal && user?.role === 'admin' && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 my-8 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Record Provenance Step</h3>
+                <h3 className="text-base font-bold text-slate-900">Record Admin Provenance Step</h3>
                 <p className="text-xs text-slate-500">
                   Batch: {activeBatch?.batch_code || `BATCH-${activeBatch?.id}`}
                 </p>

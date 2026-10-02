@@ -1,0 +1,79 @@
+{
+  "model_name": "RandomForestRegressor",
+  "target_column": "target_demand_quantity_kg",
+  "feature_columns": [
+    "product_name",
+    "category",
+    "day_of_week",
+    "month",
+    "season",
+    "temperature",
+    "humidity",
+    "inventory_age_days",
+    "remaining_shelf_life_days",
+    "inventory_quantity_kg",
+    "historical_demand_kg",
+    "supply_quantity_kg"
+  ],
+  "training_records": 3200,
+  "testing_records": 800,
+  "training_date_range": "2024-01-01 to 2026-03-03",
+  "testing_date_range": "2026-03-04 to 2026-09-28",
+  "random_state": 42,
+  "baseline_metrics": {
+    "mae": 560.89,
+    "rmse": 649.99,
+    "r2": -0.0009,
+    "mape": 70.96
+  },
+  "model_metrics": {
+    "mae": 88.28,
+    "rmse": 118.68,
+    "r2": 0.9666,
+    "mape": 7.49
+  },
+  "top_feature_importances": [
+    {
+      "feature": "historical_demand_kg",
+      "importance": 0.5149
+    },
+    {
+      "feature": "inventory_quantity_kg",
+      "importance": 0.0962
+    },
+    {
+      "feature": "season=Winter",
+      "importance": 0.0494
+    },
+    {
+      "feature": "product_name=Grapes",
+      "importance": 0.0478
+    },
+    {
+      "feature": "product_name=Mango",
+      "importance": 0.0454
+    },
+    {
+      "feature": "day_of_week",
+      "importance": 0.0448
+    },
+    {
+      "feature": "season=Summer",
+      "importance": 0.0438
+    },
+    {
+      "feature": "season=Monsoon",
+      "importance": 0.0331
+    },
+    {
+      "feature": "supply_quantity_kg",
+      "importance": 0.0205
+    },
+    {
+      "feature": "category=Fruits",
+      "importance": 0.0179
+    }
+  ],
+  "trained_at": "2026-09-28T13:43:20.678629+00:00",
+  "disclaimer": "This demand forecasting model is trained on a synthetic demonstration dataset. It serves as a functional ML prototype for AgroFlow AI and is not a representation of real-world market predictions."
+}

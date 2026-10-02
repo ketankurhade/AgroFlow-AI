@@ -35,6 +35,8 @@ export const Batches = () => {
     status: 'Harvested',
   });
 
+  const [hasFetched, setHasFetched] = useState(false);
+
   const loadBatchesAndProducts = async () => {
     setLoading(true);
     setError(null);
@@ -49,6 +51,7 @@ export const Batches = () => {
 
       setBatches(fetchedBatches);
       setProducts(fetchedProducts);
+      setHasFetched(true);
 
       if (fetchedProducts.length > 0 && !formData.product_id) {
         setFormData((prev) => ({ ...prev, product_id: fetchedProducts[0].id }));
@@ -114,8 +117,8 @@ export const Batches = () => {
     }
   };
 
-  // Prepare display items: use real batches if available, otherwise mockData
-  const displayBatches = batches.length > 0
+  // Prepare display items: use real batches from backend
+  const displayBatches = hasFetched
     ? batches.map((b) => ({
         id: b.batch_code || `BATCH-${b.id}`,
         rawId: b.id,
@@ -134,7 +137,24 @@ export const Batches = () => {
           { stage: 'Quality Inspection', location: 'Farm Audit Center', date: b.harvest_date, details: `Certified ${b.quality_grade}.` },
         ]
       }))
-    : MOCK_BATCHES;
+    : (batches.length > 0 ? batches.map((b) => ({
+        id: b.batch_code || `BATCH-${b.id}`,
+        rawId: b.id,
+        cropName: b.product?.name || `Product #${b.product_id}`,
+        qualityGrade: b.quality_grade,
+        farmerName: b.farmer?.name || user?.name || "Ramesh Kumar",
+        farmLocation: b.origin_location,
+        harvestDate: b.harvest_date,
+        expiryDate: b.expiry_date,
+        temperatureLog: b.status === 'In Cold Storage' ? '18.5°C (Optimal)' : '20.0°C (Normal)',
+        quantityKg: b.quantity,
+        status: b.status,
+        qrCodeUrl: `https://agroflow.ai/trace/${b.batch_code || b.id}`,
+        timeline: [
+          { stage: 'Harvesting', location: b.origin_location, date: b.harvest_date, details: 'Harvested under optimal conditions.' },
+          { stage: 'Quality Inspection', location: 'Farm Audit Center', date: b.harvest_date, details: `Certified ${b.quality_grade}.` },
+        ]
+      })) : []);
 
   return (
     <div className="space-y-6">
@@ -157,17 +177,20 @@ export const Batches = () => {
           <span className="text-xs font-semibold px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-full">
             {displayBatches.length} Registered Batches
           </span>
-          <button
-            onClick={() => {
-              setFormError(null);
-              setShowCreateModal(true);
-            }}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-emerald-950/20 flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Create New Batch
-          </button>
+          {['admin', 'farmer', 'supply_chain_manager', 'collection_center'].includes(user?.role) && (
+            <button
+              onClick={() => {
+                setFormError(null);
+                setShowCreateModal(true);
+              }}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-emerald-950/20 flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Create New Batch
+            </button>
+          )}
         </div>
       </div>
+
 
       {/* Success Banner */}
       {successMessage && (

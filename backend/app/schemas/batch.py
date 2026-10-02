@@ -8,7 +8,7 @@ from app.schemas.user import UserResponse
 class BatchCreate(BaseModel):
     batch_code: str
     product_id: int
-    farmer_id: int
+    farmer_id: Optional[int] = None
     quantity: float
     quality_grade: str = "Grade A"
     harvest_date: date

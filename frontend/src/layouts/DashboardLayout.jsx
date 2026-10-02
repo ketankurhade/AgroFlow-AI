@@ -9,6 +9,7 @@ export const DashboardLayout = () => {
   const getPageTitle = (path) => {
     switch (path) {
       case '/':
+      case '/dashboard':
         return 'Executive Supply Chain Dashboard';
       case '/inventory':
         return 'Cold Chain Inventory Operations';

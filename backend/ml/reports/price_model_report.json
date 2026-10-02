@@ -1,0 +1,85 @@
+{
+  "model_name": "RandomForestRegressor",
+  "target_column": "target_price_per_kg",
+  "feature_columns": [
+    "product_name",
+    "category",
+    "season",
+    "day_of_week",
+    "month",
+    "temperature",
+    "humidity",
+    "inventory_age_days",
+    "remaining_shelf_life_days",
+    "inventory_quantity_kg",
+    "historical_demand_kg",
+    "supply_quantity_kg"
+  ],
+  "excluded_target_columns": [
+    "target_price_per_kg",
+    "target_demand_quantity_kg",
+    "target_spoilage_indicator"
+  ],
+  "training_records": 3200,
+  "testing_records": 800,
+  "training_date_range": "2024-01-01 to 2026-03-03",
+  "testing_date_range": "2026-03-04 to 2026-09-28",
+  "random_state": 42,
+  "baseline_metrics": {
+    "mae": 37.46,
+    "rmse": 43.03,
+    "r2": -0.0,
+    "mape": 73.13
+  },
+  "model_metrics": {
+    "mae": 3.54,
+    "rmse": 5.17,
+    "r2": 0.9856,
+    "mape": 5.19
+  },
+  "top_feature_importances": [
+    {
+      "feature": "product_name=Apple",
+      "importance": 0.2562
+    },
+    {
+      "feature": "supply_quantity_kg",
+      "importance": 0.232
+    },
+    {
+      "feature": "product_name=Mango",
+      "importance": 0.1233
+    },
+    {
+      "feature": "category=Vegetables",
+      "importance": 0.1176
+    },
+    {
+      "feature": "historical_demand_kg",
+      "importance": 0.1027
+    },
+    {
+      "feature": "product_name=Grapes",
+      "importance": 0.0568
+    },
+    {
+      "feature": "category=Fruits",
+      "importance": 0.0409
+    },
+    {
+      "feature": "season=Summer",
+      "importance": 0.0165
+    },
+    {
+      "feature": "product_name=Orange",
+      "importance": 0.0123
+    },
+    {
+      "feature": "inventory_quantity_kg",
+      "importance": 0.0111
+    }
+  ],
+  "trained_at": "2026-09-28T13:59:14.506502+00:00",
+  "leakage_prevention": "Same-day realized target_demand_quantity_kg, target_price_per_kg, and target_spoilage_indicator were strictly excluded from feature inputs. Only pre-target features and lagged historical demand were used.",
+  "disclaimer": "This price forecasting model is trained on a synthetic demonstration dataset. It serves as a functional ML prototype for AgroFlow AI and is not a representation of real-world mandi or market price forecasts."
+}

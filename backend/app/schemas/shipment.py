@@ -13,7 +13,12 @@ class ShipmentCreate(BaseModel):
     vehicle_number: str
     status: str = "In Transit"
     dispatched_at: Optional[datetime] = None
+    expected_delivery_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
+
+
+class ShipmentStatusUpdate(BaseModel):
+    status: str
 
 
 class ShipmentResponse(BaseModel):
@@ -25,6 +30,7 @@ class ShipmentResponse(BaseModel):
     vehicle_number: str
     status: str
     dispatched_at: Optional[datetime] = None
+    expected_delivery_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
     order: Optional[OrderResponse] = None
     batch: Optional[BatchResponse] = None

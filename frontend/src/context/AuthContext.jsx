@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_USER } from '../data/mockData';
 import { authAPI } from '../services/api';
 
 const AuthContext = createContext();
@@ -10,21 +9,19 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Format backend user model with mock metadata defaults (avatar, availableRoles, organization)
+  // Format backend user model for application context
   const formatUser = (userData) => {
     if (!userData) return null;
     return {
-      ...INITIAL_USER,
-      ...userData,
-      // Map backend role to user display role if needed
-      role: userData.role || INITIAL_USER.role,
-      organization: userData.organization || INITIAL_USER.organization,
-      avatar: userData.avatar || INITIAL_USER.avatar,
-      availableRoles: INITIAL_USER.availableRoles
+      id: userData.id,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role || 'consumer',
+      created_at: userData.created_at,
     };
   };
 
-  // Verify stored token on app boot
+  // Verify stored token on app boot / browser refresh
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem('token');
@@ -67,15 +64,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const register = async (name, email, password, role) => {
+    setError(null);
+    try {
+      const response = await authAPI.register({ name, email, password, role });
+      return response.data;
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || "Registration failed. Please check your inputs.";
+      setError(errorMsg);
+      throw new Error(errorMsg);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
     setIsAuthenticated(false);
     setError(null);
-  };
-
-  const switchRole = (newRole) => {
-    setUser((prev) => (prev ? { ...prev, role: newRole } : null));
   };
 
   return (
@@ -86,9 +91,9 @@ export const AuthProvider = ({ children }) => {
         loading,
         error,
         login,
+        register,
         logout,
-        switchRole,
-        setError
+        setError,
       }}
     >
       {children}
