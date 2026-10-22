@@ -6,19 +6,19 @@ client = TestClient(app)
 
 def test_part54_health_and_flows():
     # Test health check
-    response = client.get("/health")
+    response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "healthy"
+    assert response.json()["status"] == "ok"
 
 def test_part54_role_specific_endpoints():
     # Verify that key endpoints respond cleanly without server errors
     endpoints = [
-        "/api/v1/batches",
-        "/api/v1/inventory",
-        "/api/v1/orders",
-        "/api/v1/shipments",
-        "/api/v1/spoilage/risk-summary",
-        "/api/v1/intelligence/recommendations",
+        "/api/batches",
+        "/api/inventory",
+        "/api/orders",
+        "/api/shipments",
+        "/api/spoilage/summary",
+        "/api/spoilage/risk",
     ]
     for ep in endpoints:
         resp = client.get(ep)

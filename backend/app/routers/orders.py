@@ -43,6 +43,15 @@ def get_trusted_catalog_price(product: Product) -> float:
     return 45.0
 
 
+CONSUMER_MARKUP = 0.50
+
+
+def get_consumer_price(wholesale_price: float) -> float:
+    import math
+    return float(math.ceil(wholesale_price * (1.0 + CONSUMER_MARKUP)))
+
+
+
 @router.get("", response_model=List[OrderResponse])
 def get_orders(
     skip: int = 0,
@@ -132,7 +141,8 @@ def create_order(
                     detail=f"Product with id {item_data.product_id} not found"
                 )
 
-            trusted_price = get_trusted_catalog_price(prod)
+            wholesale_price = get_trusted_catalog_price(prod)
+            trusted_price = get_consumer_price(wholesale_price)
             item_total = item_data.quantity * trusted_price
 
             # Require stock from explicitly retailer-owned inventory records

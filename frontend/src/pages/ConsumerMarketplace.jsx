@@ -113,7 +113,9 @@ export const ConsumerMarketplace = () => {
       const farmerName = matchingBatch?.farmer?.name || "Verified Farm Origin";
       const originLocation = matchingBatch?.origin_location || "Regional Hub";
 
-      const pricePerKg = p.price ? p.price : (p.category === 'Fruits' ? 120 : 45);
+      const CONSUMER_MARKUP = 0.50;
+      const wholesalePrice = p.price ? p.price : (p.category === 'Fruits' ? 120 : 45);
+      const pricePerKg = Math.ceil(wholesalePrice * (1 + CONSUMER_MARKUP));
       const discountPrice = Math.round(pricePerKg * 0.9);
 
       const getProductImage = (name, category) => {

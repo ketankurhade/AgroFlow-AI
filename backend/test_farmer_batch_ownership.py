@@ -130,7 +130,7 @@ def test_farmer_batch_ownership_and_visibility():
     # 8. Login as Admin and confirm Admin sees all batches
     admin_login = client.post("/api/auth/login", json={
         "email": "admin@agroflow.com",
-        "password": "admin123"
+        "password": "Admin@AgroFlow2026!"
     })
     assert admin_login.status_code == 200
     admin_token = admin_login.json()["access_token"]

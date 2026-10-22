@@ -31,9 +31,19 @@ def get_or_create_user(db, name: str, email: str, role: str):
 
 
 def get_or_create_product(db, name: str, category: str = "Vegetables", unit: str = "kg", price: float = 40.0):
-    prod = db.query(Product).filter(Product.name == name).first()
+    name_lower = name.lower()
+    if "potato" in name_lower:
+        canonical_name = "Potato"
+    elif "apple" in name_lower:
+        canonical_name = "Apple"
+    elif "mango" in name_lower:
+        canonical_name = "Mango"
+    else:
+        canonical_name = "Onion"
+
+    prod = db.query(Product).filter(Product.name == canonical_name).first()
     if not prod:
-        prod = Product(name=name, category=category, unit=unit, price=price)
+        prod = Product(name=canonical_name, category=category, unit=unit, price=price)
         db.add(prod)
         db.commit()
         db.refresh(prod)

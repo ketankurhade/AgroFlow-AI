@@ -89,8 +89,8 @@ def seed_db():
         db.flush()
 
         # Fetch products from DB after ensure_products_seeded
-        prod1 = db.query(Product).filter(Product.name == "Organic Alphonso Mangoes").first()
-        prod2 = db.query(Product).filter(Product.name == "Fresh Desi Tomatoes").first()
+        prod1 = db.query(Product).filter(Product.name == "Mango").first()
+        prod2 = db.query(Product).filter(Product.name == "Onion").first()
 
         # 3. Batches
         today = date.today()

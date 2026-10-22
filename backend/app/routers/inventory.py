@@ -60,8 +60,24 @@ def create_inventory(
             detail="Farmers can only add inventory for their own batches."
         )
     
-    # Check if inventory record already exists for this batch
-    existing_inventory = db.query(Inventory).filter(Inventory.batch_id == inventory_data.batch_id).first()
+    # Check if active storage inventory record already exists for this batch (owner_id IS NULL and quantity > 0)
+    existing_active_storage = db.query(Inventory).filter(
+        Inventory.batch_id == inventory_data.batch_id,
+        Inventory.owner_id.is_(None),
+        Inventory.quantity > 0
+    ).first()
+
+    if existing_active_storage:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Batch '{batch.batch_code}' already has active storage inventory and cannot be added again."
+        )
+
+    # Check if a depleted storage inventory record exists for this batch (owner_id IS NULL)
+    existing_inventory = db.query(Inventory).filter(
+        Inventory.batch_id == inventory_data.batch_id,
+        Inventory.owner_id.is_(None)
+    ).first()
     if existing_inventory:
         existing_inventory.warehouse_location = inventory_data.warehouse_location
         existing_inventory.quantity = inventory_data.quantity

@@ -26,7 +26,8 @@ def get_demo_delivery_minutes() -> float:
 
 def credit_retailer_inventory_if_needed(shipment: Shipment, db: Session) -> bool:
     """
-    Credits retailer inventory for a wholesale shipment exactly once.
+    Credits retailer inventory for a wholesale shipment exactly once and records
+    the automatic 'Retail Outlet Delivery' provenance event.
     Uses shipment.is_inventory_credited to guarantee idempotency across all reconciliation and status update paths.
     """
     if getattr(shipment, "is_inventory_credited", False):
@@ -39,17 +40,32 @@ def credit_retailer_inventory_if_needed(shipment: Shipment, db: Session) -> bool
     buyer = order.buyer
     if buyer and buyer.role == "retailer" and order.retailer_id is None:
         ret_id = order.buyer_id
-        existing_inv = (
+
+        # DB level double-check on shipment.is_inventory_credited
+        db_shipment = db.query(Shipment).filter(Shipment.id == shipment.id).first()
+        if db_shipment and db_shipment.is_inventory_credited:
+            shipment.is_inventory_credited = True
+            return False
+
+        existing_inv_list = (
             db.query(Inventory)
             .filter(Inventory.batch_id == shipment.batch_id, Inventory.owner_id == ret_id)
-            .first()
+            .order_by(Inventory.id.asc())
+            .all()
         )
-        if existing_inv:
-            existing_inv.quantity += order.total_quantity
+        if existing_inv_list:
+            target_inv = existing_inv_list[0]
+            target_inv.quantity += order.total_quantity
+            if shipment.destination:
+                target_inv.warehouse_location = shipment.destination
+            if len(existing_inv_list) > 1:
+                for dup in existing_inv_list[1:]:
+                    target_inv.quantity += dup.quantity
+                    db.delete(dup)
         else:
             new_inv = Inventory(
                 batch_id=shipment.batch_id,
-                warehouse_location=shipment.destination,
+                warehouse_location=shipment.destination or "Retail Outlet",
                 quantity=order.total_quantity,
                 owner_id=ret_id,
                 temperature=18.0,
@@ -58,6 +74,30 @@ def credit_retailer_inventory_if_needed(shipment: Shipment, db: Session) -> bool
             db.add(new_inv)
 
         shipment.is_inventory_credited = True
+        if db_shipment:
+            db_shipment.is_inventory_credited = True
+
+        # Automatically record 'Retail Outlet Delivery' provenance event exactly once
+        existing_outlet_event = (
+            db.query(TraceabilityEvent)
+            .filter(
+                TraceabilityEvent.batch_id == shipment.batch_id,
+                TraceabilityEvent.stage == "Retail Outlet Delivery"
+            )
+            .first()
+        )
+        if not existing_outlet_event:
+            ret_name = buyer.name if buyer else "Retail Store"
+            dest_loc = shipment.destination or "Retail Store Outlet"
+            event = TraceabilityEvent(
+                batch_id=shipment.batch_id,
+                stage="Retail Outlet Delivery",
+                location=dest_loc,
+                description=f"Wholesale shipment for Order #{order.order_number} ({order.total_quantity} kg) delivered and received into store inventory for {ret_name}.",
+                timestamp=shipment.delivered_at or datetime.now(timezone.utc)
+            )
+            db.add(event)
+
         return True
 
     return False
@@ -71,7 +111,7 @@ def reconcile_overdue_shipments(db: Session):
     now = datetime.now(timezone.utc)
     in_transit_shipments = (
         db.query(Shipment)
-        .filter(Shipment.status.in_(["In Transit", "Dispatched"]))
+        .filter(Shipment.status.in_(["In Transit", "Dispatched"]), Shipment.is_inventory_credited == False)
         .all()
     )
 
@@ -234,7 +274,6 @@ def update_shipment_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "supply_chain_manager", "distributor"))
 ):
-    reconcile_overdue_shipments(db)
     shipment = db.query(Shipment).filter(Shipment.id == id).first()
     if not shipment:
         raise HTTPException(
@@ -242,6 +281,13 @@ def update_shipment_status(
             detail=f"Shipment with id {id} not found"
         )
     
+    # Idempotency short-circuit: if already delivered and credited, return immediately
+    if shipment.status == "Delivered" and status_update.status == "Delivered" and shipment.is_inventory_credited:
+        return shipment
+
+    reconcile_overdue_shipments(db)
+    shipment = db.query(Shipment).filter(Shipment.id == id).first()
+
     previous_status = shipment.status
     shipment.status = status_update.status
     now = datetime.now(timezone.utc)

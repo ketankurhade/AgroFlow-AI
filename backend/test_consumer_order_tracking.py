@@ -15,16 +15,12 @@ def test_consumer_order_and_tracking_workflow():
 
     unique_suffix = str(uuid.uuid4())[:8]
 
-    # Setup Product in DB
+    # Setup Product in DB using canonical Onion product
     db = SessionLocal()
-    product = db.query(Product).first()
-    if not product:
-        product = Product(name="Fresh Desi Tomatoes", category="Vegetables", unit="kg", price=45.0)
-        db.add(product)
-        db.commit()
-        db.refresh(product)
+    product = db.query(Product).filter(Product.name == "Onion").first() or db.query(Product).first()
+    assert product is not None, "Canonical product 'Onion' must exist in database"
     product_id = product.id
-    official_price = product.price if hasattr(product, 'price') and product.price else 45.0
+    official_price = product.price if hasattr(product, 'price') and product.price else 35.0
     db.close()
 
     # 1. Register Users: Consumer A, Consumer B, Farmer, Distributor
@@ -151,8 +147,10 @@ def test_consumer_order_and_tracking_workflow():
     # Verify identity & status control
     assert order_a_data["buyer_id"] == cons_a_id, f"Buyer ID must be forced to authenticated Consumer A ({cons_a_id}), got {order_a_data['buyer_id']}"
     assert order_a_data["status"] == "Confirmed", f"Status must be forced to 'Confirmed', got {order_a_data['status']}"
-    assert order_a_data["items"][0]["price"] == official_price, f"Item price must use trusted catalog price ({official_price}), got {order_a_data['items'][0]['price']}"
-    print(f"[TEST 3] Consumer A created Order #{order_a_id}: Identity derived from JWT, status=Confirmed, price=Rs.{official_price} (Passed!)")
+    import math
+    expected_consumer_price = math.ceil(official_price * 1.50)
+    assert order_a_data["items"][0]["price"] == expected_consumer_price, f"Item price must use trusted consumer price ({expected_consumer_price}), got {order_a_data['items'][0]['price']}"
+    print(f"[TEST 3] Consumer A created Order #{order_a_id}: Identity derived from JWT, status=Confirmed, price=Rs.{expected_consumer_price} (Passed!)")
 
     # 4. Ownership Isolation: Consumer A sees Order A, Consumer B sees 0 orders
     res_orders_a = client.get("/api/orders", headers=headers_a)

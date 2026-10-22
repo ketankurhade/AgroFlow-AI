@@ -8,6 +8,8 @@ from app.models.product import Product
 from app.models.user import User
 from app.models.traceability import TraceabilityEvent
 from app.models.inventory import Inventory
+from app.models.order import Order, OrderItem
+from app.models.shipment import Shipment
 from app.schemas.batch import BatchCreate, BatchResponse
 from app.services.auth_service import require_roles
 
@@ -18,18 +20,73 @@ router = APIRouter(prefix="/batches", tags=["Batches"])
 def get_batches(
     farmer_id: Optional[int] = Query(None, description="Optional filter by farmer ID"),
     available_only: bool = Query(False, description="Filter only active non-zero available batches"),
+    unintaked_only: bool = Query(False, description="Filter batches eligible for initial storage intake (no active storage inventory)"),
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "farmer", "supply_chain_manager", "distributor", "retailer", "consumer"))
 ):
     query = db.query(Batch)
+    if unintaked_only:
+        active_storage_batch_ids = [
+            r[0] for r in db.query(Inventory.batch_id)
+            .filter(Inventory.owner_id.is_(None), Inventory.quantity > 0)
+            .all() if r[0]
+        ]
+        query = query.filter(
+            Batch.id.notin_(active_storage_batch_ids),
+            Batch.quantity > 0,
+            Batch.status.notin_(["Consumed", "Depleted", "Dispatched", "In Transit", "Delivered"])
+        )
+
     if current_user.role == "farmer":
         query = query.filter(Batch.farmer_id == current_user.id)
     elif farmer_id is not None:
         query = query.filter(Batch.farmer_id == farmer_id)
+    elif current_user.role == "retailer":
+        if available_only:
+            query = query.filter(Batch.quantity > 0, Batch.status.notin_(["Consumed", "Depleted"]))
+        else:
+            # Batches owned by retailer via inventory OR orders/shipments
+            ret_inv_batch_ids = [r[0] for r in db.query(Inventory.batch_id).filter(Inventory.owner_id == current_user.id).all() if r[0]]
+            ret_order_batch_ids = [
+                r[0] for r in db.query(OrderItem.batch_id)
+                .join(Order, OrderItem.order_id == Order.id)
+                .filter((Order.buyer_id == current_user.id) | (Order.retailer_id == current_user.id))
+                .filter(OrderItem.batch_id.isnot(None)).all() if r[0]
+            ]
+            ret_shipment_batch_ids = [
+                r[0] for r in db.query(Shipment.batch_id)
+                .join(Order, Shipment.order_id == Order.id)
+                .filter((Order.buyer_id == current_user.id) | (Order.retailer_id == current_user.id))
+                .filter(Shipment.batch_id.isnot(None)).all() if r[0]
+            ]
+            allowed_ids = list(set(ret_inv_batch_ids + ret_order_batch_ids + ret_shipment_batch_ids))
+            query = query.filter(Batch.id.in_(allowed_ids))
+    elif current_user.role == "consumer":
+        if available_only:
+            ret_avail_batch_ids = [
+                r[0] for r in db.query(Inventory.batch_id)
+                .join(User, Inventory.owner_id == User.id)
+                .filter(User.role == "retailer", Inventory.quantity > 0).all() if r[0]
+            ]
+            query = query.filter(Batch.id.in_(ret_avail_batch_ids))
+        else:
+            cons_order_batch_ids = [
+                r[0] for r in db.query(OrderItem.batch_id)
+                .join(Order, OrderItem.order_id == Order.id)
+                .filter(Order.buyer_id == current_user.id)
+                .filter(OrderItem.batch_id.isnot(None)).all() if r[0]
+            ]
+            ret_avail_batch_ids = [
+                r[0] for r in db.query(Inventory.batch_id)
+                .join(User, Inventory.owner_id == User.id)
+                .filter(User.role == "retailer", Inventory.quantity > 0).all() if r[0]
+            ]
+            allowed_ids = list(set(cons_order_batch_ids + ret_avail_batch_ids))
+            query = query.filter(Batch.id.in_(allowed_ids))
 
-    if available_only or current_user.role in ["retailer", "consumer"]:
+    if available_only and current_user.role not in ["retailer", "consumer"]:
         query = query.filter(Batch.quantity > 0, Batch.status.notin_(["Consumed", "Depleted"]))
 
     batches = query.offset(skip).limit(limit).all()
@@ -128,5 +185,43 @@ def get_batch(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: Farmers can only access their own batches."
         )
+    if current_user.role == "retailer":
+        is_ret_inv = db.query(Inventory).filter(Inventory.batch_id == batch.id, Inventory.owner_id == current_user.id).first()
+        is_ret_order = (
+            db.query(OrderItem)
+            .join(Order, OrderItem.order_id == Order.id)
+            .filter(OrderItem.batch_id == batch.id, (Order.buyer_id == current_user.id) | (Order.retailer_id == current_user.id))
+            .first()
+        )
+        is_ret_ship = (
+            db.query(Shipment)
+            .join(Order, Shipment.order_id == Order.id)
+            .filter(Shipment.batch_id == batch.id, (Order.buyer_id == current_user.id) | (Order.retailer_id == current_user.id))
+            .first()
+        )
+        is_upstream_avail = (batch.quantity > 0 and batch.status not in ["Consumed", "Depleted"])
+        if not (is_ret_inv or is_ret_order or is_ret_ship or is_upstream_avail):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Retailers can only access batches in their inventory, orders, or upstream catalog."
+            )
+    if current_user.role == "consumer":
+        is_cons_order = (
+            db.query(OrderItem)
+            .join(Order, OrderItem.order_id == Order.id)
+            .filter(OrderItem.batch_id == batch.id, Order.buyer_id == current_user.id)
+            .first()
+        )
+        is_ret_avail = (
+            db.query(Inventory)
+            .join(User, Inventory.owner_id == User.id)
+            .filter(Inventory.batch_id == batch.id, User.role == "retailer", Inventory.quantity > 0)
+            .first()
+        )
+        if not (is_cons_order or is_ret_avail):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Consumers can only access batches for their purchased orders or available retail stock."
+            )
     return batch
 

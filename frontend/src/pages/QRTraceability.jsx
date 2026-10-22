@@ -39,21 +39,43 @@ export const QRTraceability = () => {
     setError(null);
     try {
       const res = await batchesAPI.getBatches().catch(() => ({ data: [] }));
-      const fetchedBatches = res.data || [];
-      setBatches(fetchedBatches);
+      let fetchedBatches = res.data || [];
 
-      if (fetchedBatches.length > 0) {
-        let initial = null;
-        if (urlBatchParam) {
-          initial = fetchedBatches.find(
-            (b) =>
-              b.id.toString() === urlBatchParam ||
-              (b.batch_code && b.batch_code.toLowerCase() === urlBatchParam.toLowerCase())
-          );
+      if (urlBatchParam) {
+        let initial = fetchedBatches.find(
+          (b) =>
+            b.id.toString() === urlBatchParam ||
+            (b.batch_code && b.batch_code.toLowerCase() === urlBatchParam.toLowerCase())
+        );
+
+        if (!initial) {
+          try {
+            const singleRes = await batchesAPI.getBatch(urlBatchParam);
+            if (singleRes.data) {
+              initial = singleRes.data;
+              if (!fetchedBatches.some((b) => b.id === initial.id)) {
+                fetchedBatches = [initial, ...fetchedBatches];
+              }
+            }
+          } catch (e) {
+            console.log("Could not fetch batch directly by URL param:", e);
+          }
         }
-        const selected = initial || fetchedBatches[0];
-        setActiveBatch(selected);
-        setSearchQuery(selected.batch_code || `BATCH-${selected.id}`);
+
+        setBatches(fetchedBatches);
+        if (initial) {
+          setActiveBatch(initial);
+          setSearchQuery(initial.batch_code || `BATCH-${initial.id}`);
+        } else if (fetchedBatches.length > 0) {
+          setActiveBatch(fetchedBatches[0]);
+          setSearchQuery(fetchedBatches[0].batch_code || `BATCH-${fetchedBatches[0].id}`);
+        }
+      } else {
+        setBatches(fetchedBatches);
+        if (fetchedBatches.length > 0) {
+          setActiveBatch(fetchedBatches[0]);
+          setSearchQuery(fetchedBatches[0].batch_code || `BATCH-${fetchedBatches[0].id}`);
+        }
       }
     } catch (err) {
       console.error("Failed to load batches:", err);
@@ -95,7 +117,7 @@ export const QRTraceability = () => {
     setSearchParams({ batch: batch.id.toString() });
   };
 
-  const handleSearchSubmit = (e) => {
+  const handleSearchSubmit = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
@@ -109,6 +131,17 @@ export const QRTraceability = () => {
     if (found) {
       handleSelectBatch(found);
     } else {
+      try {
+        const singleRes = await batchesAPI.getBatch(searchQuery.trim());
+        if (singleRes.data) {
+          const newBatch = singleRes.data;
+          setBatches((prev) => [newBatch, ...prev.filter((b) => b.id !== newBatch.id)]);
+          handleSelectBatch(newBatch);
+          return;
+        }
+      } catch (err) {
+        console.log("Direct batch lookup error:", err);
+      }
       setError(`No matching batch found for "${searchQuery}".`);
       setTimeout(() => setError(null), 4000);
     }

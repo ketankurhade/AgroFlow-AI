@@ -11,7 +11,7 @@ client = TestClient(app)
 
 def test_spoilage_scoring_unit_cases():
     today = date.today()
-    p = Product(id=99, name="Test Mangoes", category="Fruits")
+    p = Product(id=99, name="Mango", category="Fruits")
 
     # 1. Normal / Low-Risk Inventory
     b1 = Batch(id=101, batch_code="B1-LOW", harvest_date=today - timedelta(days=2), expiry_date=today + timedelta(days=20), product=p)

@@ -21,7 +21,7 @@ def initialize_admin_account():
 
     admin_name = os.getenv("ADMIN_NAME", "AgroFlow Administrator")
     admin_email = os.getenv("ADMIN_EMAIL", "admin@agroflow.com").strip().lower()
-    admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
+    admin_password = os.getenv("ADMIN_PASSWORD", "Admin@AgroFlow2026!")
 
     db = SessionLocal()
     try:

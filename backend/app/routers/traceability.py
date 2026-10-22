@@ -11,6 +11,11 @@ from app.services.auth_service import get_current_user, require_roles
 router = APIRouter(prefix="/traceability", tags=["Traceability"])
 
 
+from app.models.inventory import Inventory
+from app.models.order import Order, OrderItem
+from app.models.shipment import Shipment
+
+
 @router.get("/batch/{batch_id}", response_model=List[TraceabilityEventResponse])
 def get_traceability_events_by_batch(
     batch_id: int,
@@ -28,6 +33,45 @@ def get_traceability_events_by_batch(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: Farmers can only view traceability events for their own batches."
         )
+    if current_user.role == "retailer":
+        is_ret_inv = db.query(Inventory).filter(Inventory.batch_id == batch.id, Inventory.owner_id == current_user.id).first()
+        is_ret_order = (
+            db.query(OrderItem)
+            .join(Order, OrderItem.order_id == Order.id)
+            .filter(OrderItem.batch_id == batch.id, (Order.buyer_id == current_user.id) | (Order.retailer_id == current_user.id))
+            .first()
+        )
+        is_ret_ship = (
+            db.query(Shipment)
+            .join(Order, Shipment.order_id == Order.id)
+            .filter(Shipment.batch_id == batch.id, (Order.buyer_id == current_user.id) | (Order.retailer_id == current_user.id))
+            .first()
+        )
+        is_upstream_avail = (batch.quantity > 0 and batch.status not in ["Consumed", "Depleted"])
+        if not (is_ret_inv or is_ret_order or is_ret_ship or is_upstream_avail):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Retailers can only view traceability events for their own inventory, orders, or available stock."
+            )
+    if current_user.role == "consumer":
+        is_cons_order = (
+            db.query(OrderItem)
+            .join(Order, OrderItem.order_id == Order.id)
+            .filter(OrderItem.batch_id == batch.id, Order.buyer_id == current_user.id)
+            .first()
+        )
+        is_ret_avail = (
+            db.query(Inventory)
+            .join(User, Inventory.owner_id == User.id)
+            .filter(Inventory.batch_id == batch.id, User.role == "retailer", Inventory.quantity > 0)
+            .first()
+        )
+        if not (is_cons_order or is_ret_avail):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Consumers can only view traceability events for their purchased orders or available retail stock."
+            )
+
     events = (
         db.query(TraceabilityEvent)
         .filter(TraceabilityEvent.batch_id == batch_id)

@@ -38,7 +38,7 @@ export const Inventory = () => {
     try {
       const [invRes, batchRes, spoilageRes] = await Promise.all([
         inventoryAPI.getInventory().catch(() => ({ data: [] })),
-        batchesAPI.getBatches().catch(() => ({ data: [] })),
+        batchesAPI.getBatches({ unintaked_only: true }).catch(() => ({ data: [] })),
         spoilageAPI.getRisk().catch(() => ({ data: [] })),
       ]);
 
@@ -50,8 +50,13 @@ export const Inventory = () => {
       setBatches(fetchedBatches);
       setSpoilageRisks(fetchedRisks);
 
-      if (fetchedBatches.length > 0 && !formData.batch_id) {
-        setFormData((prev) => ({ ...prev, batch_id: fetchedBatches[0].id }));
+      if (fetchedBatches.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          batch_id: fetchedBatches.find(b => b.id === prev.batch_id) ? prev.batch_id : fetchedBatches[0].id
+        }));
+      } else {
+        setFormData((prev) => ({ ...prev, batch_id: '' }));
       }
     } catch (err) {
       console.error("Failed to load inventory data:", err);
@@ -68,11 +73,18 @@ export const Inventory = () => {
   const handleCreateInventory = async (e) => {
     e.preventDefault();
     setFormError(null);
+
+    const selectedBatchId = parseInt(formData.batch_id);
+    if (!selectedBatchId || isNaN(selectedBatchId)) {
+      setFormError("No eligible harvest batch available for cold storage intake.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const payload = {
-        batch_id: parseInt(formData.batch_id || batches[0]?.id || 1),
+        batch_id: selectedBatchId,
         warehouse_location: formData.warehouse_location.trim(),
         quantity: parseFloat(formData.quantity),
         temperature: parseFloat(formData.temperature),
@@ -84,16 +96,7 @@ export const Inventory = () => {
       setSuccessMessage(`Successfully registered inventory lot at ${payload.warehouse_location}`);
       setShowAddModal(false);
 
-      // Reset form
-      setFormData({
-        batch_id: batches[0]?.id || '',
-        warehouse_location: 'Mumbai Cold Storage - Bay 4',
-        quantity: 500,
-        temperature: 18.0,
-        humidity: 65.0,
-      });
-
-      // Refresh inventory list
+      // Refresh inventory list & eligible batches
       await loadInventoryAndBatches();
 
       setTimeout(() => setSuccessMessage(null), 5000);
@@ -383,14 +386,24 @@ export const Inventory = () => {
                   value={formData.batch_id}
                   onChange={(e) => setFormData({ ...formData, batch_id: e.target.value })}
                   required
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  disabled={batches.length === 0}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden disabled:opacity-50"
                 >
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.batch_code || `Batch #${b.id}`} — {b.product?.name || `Product #${b.product_id}`} ({b.quantity} kg)
-                    </option>
-                  ))}
+                  {batches.length === 0 ? (
+                    <option value="">No eligible harvest batches available</option>
+                  ) : (
+                    batches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.batch_code || `Batch #${b.id}`} — {b.product?.name || `Product #${b.product_id}`} ({b.quantity} kg)
+                      </option>
+                    ))
+                  )}
                 </select>
+                {batches.length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1 font-medium">
+                    All harvested batches have already been intaked into cold storage or dispatched.
+                  </p>
+                )}
               </div>
 
               <div>

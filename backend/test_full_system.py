@@ -16,7 +16,7 @@ def test_full_system():
 
     import os
     admin_email = os.getenv("ADMIN_EMAIL", "admin@agroflow.com")
-    admin_pwd = os.getenv("ADMIN_PASSWORD", "admin123")
+    admin_pwd = os.getenv("ADMIN_PASSWORD", "Admin@AgroFlow2026!")
     r = client.post("/api/auth/login", json={"email": admin_email, "password": admin_pwd})
     assert r.status_code == 200, f"Admin login failed: {r.text}"
     token = r.json()["access_token"]

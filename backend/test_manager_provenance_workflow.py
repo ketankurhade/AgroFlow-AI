@@ -119,12 +119,12 @@ def test_manager_provenance_workflow():
     assert trace_b1_after[1]["location"] == "Pune Cold Facility - Bay B2"
     print("[TEST 6 PASSED] Chronological timeline 'Farmer Harvest' -> 'Cold Storage Intake' verified!")
 
-    # 7. Idempotency Check: Manager retries/re-submits cold storage intake for same batch
+    # 7. Idempotency Check: Manager retries/re-submits cold storage intake for same batch -> HTTP 400 Bad Request
     intake_retry_res = client.post("/api/inventory", json=cold_storage_payload, headers=headers_m)
-    assert intake_retry_res.status_code == 201
+    assert intake_retry_res.status_code == 400, f"Expected 400 when retrying intake on intaked batch, got {intake_retry_res.status_code}: {intake_retry_res.text}"
     trace_b1_retry = client.get(f"/api/traceability/batch/{batch1_id}", headers=headers_m).json()
     assert len(trace_b1_retry) == 2, f"Retry must NOT create duplicate Cold Storage Intake events (got {len(trace_b1_retry)} events)"
-    print("[TEST 7 PASSED] Retrying cold storage intake did NOT produce duplicate events!")
+    print("[TEST 7 PASSED] Retrying cold storage intake correctly rejected with HTTP 400!")
 
     # 8. Create Batch 2 as Farmer (Unrelated Batch) & verify it does NOT have Cold Storage Intake yet
     batch_payload_2 = {
@@ -148,7 +148,7 @@ def test_manager_provenance_workflow():
     print("[TEST 8 PASSED] Unstored Batch 2 has only 'Farmer Harvest' event (no unearned Cold Storage Intake)!")
 
     # 9. Admin manual provenance creation remains intact
-    admin_login = client.post("/api/auth/login", json={"email": "admin@agroflow.com", "password": "admin123"})
+    admin_login = client.post("/api/auth/login", json={"email": "admin@agroflow.com", "password": "Admin@AgroFlow2026!"})
     assert admin_login.status_code == 200
     headers_admin = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
 

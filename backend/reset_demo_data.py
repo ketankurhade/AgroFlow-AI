@@ -89,15 +89,27 @@ def reset_demo_data():
                     res = conn.execute(text(f'DELETE FROM "{table}"'))
                     print(f"  - Cleared {table}: {res.rowcount} records deleted.")
 
-            # Reset PostgreSQL primary key sequences for cleared tables
+            # Delete non-canonical demo/test products from products table
+            if "products" in existing_tables:
+                res_prod = conn.execute(
+                    text('DELETE FROM "products" WHERE name NOT IN (:p1, :p2, :p3, :p4)'),
+                    {"p1": "Onion", "p2": "Potato", "p3": "Apple", "p4": "Mango"}
+                )
+                print(f"  - Cleared non-permanent products: {res_prod.rowcount} records deleted.")
+
+            # Reset PostgreSQL primary key sequences for cleared tables + products
             print("\nResetting PostgreSQL sequences for cleared tables...")
-            for table in tables_to_clear:
+            for table in tables_to_clear + ["products"]:
                 if table in existing_tables:
                     seq_query = text(f"SELECT pg_get_serial_sequence('{table}', 'id')")
                     seq_name = conn.execute(seq_query).scalar()
                     if seq_name:
-                        conn.execute(text(f"ALTER SEQUENCE {seq_name} RESTART WITH 1"))
-                        print(f"  - Sequence '{seq_name}' restarted at 1.")
+                        if table == "products":
+                            conn.execute(text(f"SELECT setval('{seq_name}', (SELECT COALESCE(MAX(id), 1) FROM products))"))
+                            print(f"  - Sequence '{seq_name}' updated to match max product ID.")
+                        else:
+                            conn.execute(text(f"ALTER SEQUENCE {seq_name} RESTART WITH 1"))
+                            print(f"  - Sequence '{seq_name}' restarted at 1.")
 
             trans.commit()
             print("\nTransaction committed successfully.")

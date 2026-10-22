@@ -17,11 +17,23 @@ def test_all_21_marketplace_requirements():
     unique_suffix = str(uuid.uuid4())[:8]
     db = SessionLocal()
 
-    # Create distinct product for isolated stock testing
-    product = Product(name=f"Marketplace Tomato {unique_suffix}", category="Vegetables", unit="kg", price=45.0)
-    db.add(product)
+    from app.models.shipment import Shipment
+    from app.models.order import Order, OrderItem
+    from app.models.inventory import Inventory
+    from app.models.traceability import TraceabilityEvent
+    from app.models.batch import Batch
+
+    db.query(Shipment).delete()
+    db.query(OrderItem).delete()
+    db.query(Order).delete()
+    db.query(Inventory).delete()
+    db.query(TraceabilityEvent).delete()
+    db.query(Batch).delete()
     db.commit()
-    db.refresh(product)
+
+    # Use canonical product from DB
+    product = db.query(Product).filter(Product.name == "Onion").first() or db.query(Product).first()
+    assert product is not None, "Canonical product 'Onion' must exist in database"
     product_id = product.id
     db.close()
 
@@ -290,11 +302,9 @@ def test_automatic_wholesale_delivery_simulation():
     unique_suffix = str(uuid.uuid4())[:8]
     db = SessionLocal()
 
-    # Create distinct product
-    product = Product(name=f"Demo Auto Delivery Mango {unique_suffix}", category="Fruits", unit="kg", price=120.0)
-    db.add(product)
-    db.commit()
-    db.refresh(product)
+    # Use canonical product from DB
+    product = db.query(Product).filter(Product.name == "Mango").first() or db.query(Product).first()
+    assert product is not None, "Canonical product 'Mango' must exist in database"
     product_id = product.id
 
     # Register Retailer

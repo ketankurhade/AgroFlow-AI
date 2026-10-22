@@ -14,14 +14,10 @@ def test_distributor_qr_traceability_workflow():
 
     unique_suffix = str(uuid.uuid4())[:8]
 
-    # Setup Product in DB
+    # Setup Product in DB using canonical product
     db = SessionLocal()
-    product = db.query(Product).first()
-    if not product:
-        product = Product(name="Fresh Desi Tomatoes", category="Vegetables", unit="kg")
-        db.add(product)
-        db.commit()
-        db.refresh(product)
+    product = db.query(Product).filter(Product.name == "Onion").first() or db.query(Product).first()
+    assert product is not None, "Canonical product 'Onion' must exist in database"
     product_id = product.id
     db.close()
 

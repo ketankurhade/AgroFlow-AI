@@ -31,32 +31,39 @@ def get_or_create_user(db, name: str, email: str, role: str):
 
 
 def get_or_create_product(db, name: str, category: str = "Vegetables", unit: str = "kg", price: float = 40.0):
-    prod = db.query(Product).filter(Product.name == name).first()
+    name_lower = name.lower()
+    if "potato" in name_lower:
+        canonical_name = "Potato"
+    elif "apple" in name_lower:
+        canonical_name = "Apple"
+    elif "mango" in name_lower:
+        canonical_name = "Mango"
+    else:
+        canonical_name = "Onion"
+
+    prod = db.query(Product).filter(Product.name == canonical_name).first()
     if not prod:
-        prod = Product(name=name, category=category, unit=unit, price=price)
+        prod = Product(name=canonical_name, category=category, unit=unit, price=price)
         db.add(prod)
         db.commit()
         db.refresh(prod)
     return prod
 
 
+def clear_operational_data(db):
+    db.query(Shipment).delete()
+    db.query(OrderItem).delete()
+    db.query(Order).delete()
+    db.query(Inventory).delete()
+    db.query(TraceabilityEvent).delete()
+    db.query(Batch).delete()
+    db.commit()
+
+
 def test_manager_inventory_scope():
-    """
-    TEST 1 — MANAGER INVENTORY SCOPE
-    Create:
-    Upstream: Onion = 0 kg, Potato = 300 kg
-    Retailer A: Onion = 400 kg
-
-    Login as Supply Chain / Storage Manager.
-    GET /api/inventory
-
-    Expected:
-    - Potato 300 kg appears
-    - Upstream Onion 0 kg does NOT appear
-    - Retailer Onion 400 kg does NOT appear
-    """
     db = SessionLocal()
     try:
+        clear_operational_data(db)
         suffix = uuid.uuid4().hex[:6]
         manager = get_or_create_user(db, "Storage Manager Test", f"mgr_{suffix}@example.com", "supply_chain_manager")
         farmer = get_or_create_user(db, "Farmer Test M1", f"farmer_m1_{suffix}@example.com", "farmer")
@@ -95,21 +102,9 @@ def test_manager_inventory_scope():
 
 
 def test_retailer_inventory_scope():
-    """
-    TEST 2 — RETAILER INVENTORY SCOPE
-    Create:
-    Retailer A: Onion = 400 kg, Potato = 250 kg, Apple = 0 kg
-
-    Login as Retailer A.
-    GET /api/inventory
-
-    Expected:
-    - Onion 400 kg appears
-    - Potato 250 kg appears
-    - Apple 0 kg does NOT appear
-    """
     db = SessionLocal()
     try:
+        clear_operational_data(db)
         suffix = uuid.uuid4().hex[:6]
         retailer_a = get_or_create_user(db, "Retailer A Test 2", f"ret_a2_{suffix}@example.com", "retailer")
         farmer = get_or_create_user(db, "Farmer Test R2", f"farmer_r2_{suffix}@example.com", "farmer")
@@ -144,19 +139,9 @@ def test_retailer_inventory_scope():
 
 
 def test_retailer_cannot_see_other_retailer_stock():
-    """
-    TEST 3 — RETAILER CANNOT SEE ANOTHER RETAILER'S STOCK
-    Create:
-    Retailer A: Onion = 400 kg
-    Retailer B: Onion = 300 kg
-
-    Login as Retailer A.
-    Expected:
-    - only Retailer A's 400 kg appears
-    - Retailer B's 300 kg does NOT appear
-    """
     db = SessionLocal()
     try:
+        clear_operational_data(db)
         suffix = uuid.uuid4().hex[:6]
         retailer_a = get_or_create_user(db, "Retailer A Test 3", f"ret_a3_{suffix}@example.com", "retailer")
         retailer_b = get_or_create_user(db, "Retailer B Test 3", f"ret_b3_{suffix}@example.com", "retailer")
@@ -185,14 +170,9 @@ def test_retailer_cannot_see_other_retailer_stock():
 
 
 def test_marketplace_regression_scopes():
-    """
-    TEST 4 — MARKETPLACE REGRESSION
-    Verify:
-    Retailer Marketplace: upstream inventory only (owner_id IS NULL, quantity > 0)
-    Consumer Marketplace: retailer-owned inventory only (owner_id == retailer, quantity > 0)
-    """
     db = SessionLocal()
     try:
+        clear_operational_data(db)
         suffix = uuid.uuid4().hex[:6]
         retailer = get_or_create_user(db, "Retailer M4", f"ret_m4_{suffix}@example.com", "retailer")
         consumer = get_or_create_user(db, "Consumer M4", f"cons_m4_{suffix}@example.com", "consumer")

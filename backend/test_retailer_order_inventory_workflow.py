@@ -14,14 +14,27 @@ def test_retailer_order_inventory_workflow():
 
     unique_suffix = str(uuid.uuid4())[:8]
 
-    # Setup Unique Product in DB for isolated stock testing
+    # Setup Product in DB using canonical product
     db = SessionLocal()
-    product = Product(name=f"Unique Test Tomato {unique_suffix}", category="Vegetables", unit="kg", price=45.0)
-    db.add(product)
+
+    from app.models.shipment import Shipment
+    from app.models.order import Order, OrderItem
+    from app.models.inventory import Inventory
+    from app.models.traceability import TraceabilityEvent
+    from app.models.batch import Batch
+
+    db.query(Shipment).delete()
+    db.query(OrderItem).delete()
+    db.query(Order).delete()
+    db.query(Inventory).delete()
+    db.query(TraceabilityEvent).delete()
+    db.query(Batch).delete()
     db.commit()
-    db.refresh(product)
+
+    product = db.query(Product).filter(Product.name == "Onion").first() or db.query(Product).first()
+    assert product is not None, "Canonical product 'Onion' must exist in database"
     product_id = product.id
-    official_price = 45.0
+    official_price = product.price if hasattr(product, 'price') and product.price else 35.0
     db.close()
 
     # 1. Setup Users (Retailer A, Retailer B, Farmer, Distributor)

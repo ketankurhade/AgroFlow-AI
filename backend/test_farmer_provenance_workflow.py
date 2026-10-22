@@ -42,17 +42,17 @@ def test_farmer_provenance_workflow():
     for name in product_names:
         print(f"  - {name}")
 
-    assert "Organic Alphonso Mangoes" in product_names, "Organic Alphonso Mangoes missing"
-    assert "Fresh Desi Tomatoes" in product_names, "Fresh Desi Tomatoes missing"
-    assert "Red Onions" in product_names, "Red Onions missing"
-    assert "Cold Storage Potatoes" in product_names, "Cold Storage Potatoes missing"
-    assert len(products) >= 8, f"Expected at least 8 expanded products, found {len(products)}"
-    print("[TEST 2 PASSED] Expanded product catalog verified!")
+    assert "Onion" in product_names, "Onion missing"
+    assert "Potato" in product_names, "Potato missing"
+    assert "Apple" in product_names, "Apple missing"
+    assert "Mango" in product_names, "Mango missing"
+    assert len(products) == 4, f"Expected exactly 4 canonical products, found {len(products)}"
+    print("[TEST 2 PASSED] Canonical product catalog verified!")
 
     # 3. Create Batch as Farmer 1 and Verify Auto 'Farmer Harvest' Provenance Event
     batch_payload = {
         "batch_code": f"BATCH-PROV-{unique_1}",
-        "product_id": products[2]["id"],  # e.g., Red Onions
+        "product_id": products[0]["id"],  # e.g., Onion
         "farmer_id": farmer1_id,
         "quantity": 1500.0,
         "quality_grade": "Grade A+",
@@ -144,7 +144,7 @@ def test_farmer_provenance_workflow():
     # 6. Admin Provenance Event Creation Test -> MUST WORK (201 Created)
     admin_login = client.post("/api/auth/login", json={
         "email": "admin@agroflow.com",
-        "password": "admin123"
+        "password": "Admin@AgroFlow2026!"
     })
     assert admin_login.status_code == 200, f"Admin login failed: {admin_login.text}"
     admin_token = admin_login.json()["access_token"]
